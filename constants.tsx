@@ -19,8 +19,8 @@ export const TRIAGE_CATEGORIES: TriageCategory[] = [
     id: 'neuro',
     name: '神经系统',
     symptoms: [
-      { id: 'n1', name: 'G: GCS 评分 3~9 分 (1级)', level: TriageLevel.L1, helperInfo: 'GCS 3～9 分。表现为无反应，气道不能维持。' },
-      { id: 'n2', name: 'G: GCS 评分 10~13 分 (2级)', level: TriageLevel.L2, helperInfo: 'GCS 10～13 分。生命体征异常，面临生命危险。' },
+      { id: 'n1', name: 'G: GCS 评分 3~9 分 (1级)', level: TriageLevel.L1, helperInfo: '儿童改良版格拉斯哥昏迷评分 (GCS) 3～9 分。表现为无反应，气道不能维持。' },
+      { id: 'n2', name: 'G: GCS 评分 10~13 分 (2级)', level: TriageLevel.L2, helperInfo: '儿童改良版格拉斯哥昏迷评分 (GCS) 10～13 分。生命体征异常，面临生命危险。' },
       { id: 'n3', name: '持续惊厥发作 (1级)', level: TriageLevel.L1 },
       { id: 'n4', name: '嗜睡 / 烦躁不安 / 浅昏迷 (2级)', level: TriageLevel.L2 },
       { id: 'n5', name: '剧烈头痛伴频繁呕吐 (2级)', level: TriageLevel.L2 },
@@ -32,9 +32,24 @@ export const TRIAGE_CATEGORIES: TriageCategory[] = [
     id: 'resp',
     name: '呼吸系统',
     symptoms: [
-      { id: 'r1', name: 'R: 重度呼吸窘迫 (1级)', level: TriageLevel.L1, helperInfo: '呼吸频率(表3:1级), 发绀，脉速，吸气性三凹征，鼻扇，呻吟等。' },
-      { id: 'r2', name: 'R: 中度呼吸窘迫 (2级)', level: TriageLevel.L2, helperInfo: '明显气促(表3:2级), 烦躁，轻度三凹征，鼻扇等。' },
-      { id: 'r3', name: 'R: 轻度呼吸窘迫 (3级)', level: TriageLevel.L3, helperInfo: '气促(表3:3级), 劳累后气短，无明显三凹征等。' },
+      { 
+        id: 'r1', 
+        name: 'R: 重度呼吸窘迫 (1级)', 
+        level: TriageLevel.L1, 
+        helperInfo: '【Paediatric CTAS 呼吸分级 - 1级】\n- 呼吸频率(次/min)：>70(<3月); >60(3-12月); >50(1-3岁); >40(4-11岁); >30(>=12岁)\n- 表现：发绀、脉速、反应差、吸气性三凹征、呻吟、单字或不能说话、上气道梗阻。' 
+      },
+      { 
+        id: 'r2', 
+        name: 'R: 中度呼吸窘迫 (2级)', 
+        level: TriageLevel.L2, 
+        helperInfo: '【Paediatric CTAS 呼吸分级 - 2级】\n- 呼吸频率(次/min)：60-70(<3月); 50-60(3-12月); 40-50(1-3岁); 30-40(4-11岁); 20-30(>=12岁)\n- 表现：轻度吸气性三凹征、鼻扇、说短词或短句、呼气延长、喘鸣。' 
+      },
+      { 
+        id: 'r3', 
+        name: 'R: 轻度呼吸窘迫 (3级)', 
+        level: TriageLevel.L3, 
+        helperInfo: '【Paediatric CTAS 呼吸分级 - 3级】\n- 呼吸频率(次/min)：50-60(<3月); 40-50(3-12月); 30-40(1-3岁); 20-30(4-11岁); 15-20(>=12岁)\n- 表现：说话成句、喘鸣无气道梗阻、时常咳嗽。' 
+      },
       { id: 'r4', name: 'SpO2 < 90% (1级)', level: TriageLevel.L1 },
       { id: 'r5', name: 'SpO2 90% ~ 94% (2级)', level: TriageLevel.L2 }
     ]
@@ -43,8 +58,18 @@ export const TRIAGE_CATEGORIES: TriageCategory[] = [
     id: 'circ',
     name: '循环系统',
     symptoms: [
-      { id: 'c1', name: 'C: 失代偿性休克 (1级)', level: TriageLevel.L1, helperInfo: '面色苍白/湿冷/脉弱/心率异常(表4:1级)/低血压/意识下降。' },
-      { id: 'c2', name: 'C: 代偿性休克 (2级)', level: TriageLevel.L2, helperInfo: '组织灌注不良(CRT 3-5s)/心动过速(表4:2级)，血压可正常。' },
+      { 
+        id: 'c1', 
+        name: 'C: 失代偿性休克 (1级)', 
+        level: TriageLevel.L1, 
+        helperInfo: '【Paediatric CTAS 心率分级 - 1级】\n- 心率(次/min)：>210或<80(<3月); >190或<80(3-12月); >180或<80(1-3岁); >160或<60(4-11岁); >140或<50(>=12岁)\n- 表现：面色苍白/花斑、四肢湿冷、意识下降。' 
+      },
+      { 
+        id: 'c2', 
+        name: 'C: 代偿性休克 (2级)', 
+        level: TriageLevel.L2, 
+        helperInfo: '【Paediatric CTAS 心率分级 - 2级】\n- 心率(次/min)：180-210(<3月); 170-190(3-12月); 150-180(1-3岁); 130-160(4-11岁); 110-140(>=12岁)\n- 表现：组织灌注不良、CRT 3-5s、心动过速。' 
+      },
       { id: 'c3', name: 'C: 心动过速/过缓伴血压正常 (3级)', level: TriageLevel.L3 },
       { id: 'c4', name: '心搏骤停 (1级)', level: TriageLevel.L1 },
       { id: 'c5', name: '活动性大出血 (2级)', level: TriageLevel.L2 }
