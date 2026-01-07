@@ -2,8 +2,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { VitalSigns } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-
 export const getAIClinicalReport = async (
   age: { years: string; months: string; days: string },
   weight: string,
@@ -11,6 +9,9 @@ export const getAIClinicalReport = async (
   selectedSymptoms: string[],
   triageLevel: string
 ) => {
+  // Always use process.env.API_KEY directly and initialize GoogleGenAI within the scope of the request.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
   const prompt = `
     作为一名资深儿科急诊专家，请针对以下患儿情况提供一份深度的临床预检分析报告：
     
