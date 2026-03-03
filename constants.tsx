@@ -16,91 +16,210 @@ export const HIGH_RISK_FACTORS = [
 
 export const TRIAGE_CATEGORIES: TriageCategory[] = [
   {
+    id: 'temp_age',
+    name: '体温与年龄',
+    symptoms: [
+      { id: 't1', name: '高热伴热惊厥 (1级)', level: TriageLevel.L1 },
+      { id: 't2', name: '体温≥41℃ 或 体温≤35℃ (1级)', level: TriageLevel.L1 },
+      { id: 't3', name: '≤24h新生儿 (1级)', level: TriageLevel.L1 },
+      { id: 't4', name: '体温≥39℃ (2级)', level: TriageLevel.L2 },
+      { id: 't5', name: '≤3月婴儿 (2级)', level: TriageLevel.L2 },
+      { id: 't6', name: '体温≥38.5℃ (3级)', level: TriageLevel.L3 },
+      { id: 't7', name: '＞3月婴儿 (3级)', level: TriageLevel.L3 },
+      { id: 't8', name: '体温≥38℃ (4级)', level: TriageLevel.L4 }
+    ]
+  },
+  {
     id: 'neuro',
     name: '神经系统',
     symptoms: [
-      { id: 'n1', name: 'G: GCS 评分 3~9 分 (1级)', level: TriageLevel.L1, helperInfo: '儿童改良版格拉斯哥昏迷评分 (GCS) 3～9 分。表现为无反应，气道不能维持。' },
-      { id: 'n2', name: 'G: GCS 评分 10~13 分 (2级)', level: TriageLevel.L2, helperInfo: '儿童改良版格拉斯哥昏迷评分 (GCS) 10～13 分。生命体征异常，面临生命危险。' },
-      { id: 'n3', name: '持续惊厥发作 (1级)', level: TriageLevel.L1 },
-      { id: 'n4', name: '嗜睡 / 烦躁不安 / 浅昏迷 (2级)', level: TriageLevel.L2 },
-      { id: 'n5', name: '剧烈头痛伴频繁呕吐 (2级)', level: TriageLevel.L2 },
-      { id: 'n6', name: '急性瘫痪 / 松软儿 (2级)', level: TriageLevel.L2 },
-      { id: 'n8', name: '神志清楚 (GCS 14-15分)', level: TriageLevel.L4 }
+      { id: 'n1', name: '深昏迷 (GCS ≤9分) (1级)', level: TriageLevel.L1, helperInfo: '儿童改良版格拉斯哥昏迷评分 (GCS) 3～9 分。表现为无反应，气道不能维持。', confirmMessage: 'GCS 评分≤9 分为 1 级' },
+      { id: 'n2', name: '浅昏迷、嗜睡、烦躁不安(谵妄) (GCS 10-13分) (2级)', level: TriageLevel.L2, helperInfo: '儿童改良版格拉斯哥昏迷评分 (GCS) 10～13 分。', confirmMessage: 'GCS 评分 10~13 分为 2 级' },
+      { id: 'n3', name: '惊厥发作后24h (2级)', level: TriageLevel.L2 },
+      { id: 'n4', name: '剧烈头痛 (2级)', level: TriageLevel.L2, helperInfo: '剧烈/严重疼痛 7-10分', confirmMessage: '急性疼痛程度：剧烈 / 严重疼痛 7~10 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
+      { id: 'n5', name: '急性瘫痪/松软儿 (2级)', level: TriageLevel.L2 },
+      { id: 'n6', name: '精神状态改变；短暂意识不清楚 (3级)', level: TriageLevel.L3 },
+      { id: 'n7', name: '明显头痛 (3级)', level: TriageLevel.L3, helperInfo: '中度疼痛 4-6分', confirmMessage: '急性疼痛程度：中度疼痛 4~6 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
+      { id: 'n8', name: '神志清楚、对答切题 (4级)', level: TriageLevel.L4 },
+      { id: 'n9', name: '神志清楚对答切题 (5级)', level: TriageLevel.L5 }
     ]
   },
   {
     id: 'resp',
     name: '呼吸系统',
     symptoms: [
-      { id: 'r1', name: 'R: 重度呼吸窘迫 (1级)', level: TriageLevel.L1, helperInfo: 'Paediatric CTAS 1级标准：>70(<3月); >60(3-12月); >50(1-3岁); >40(4-11岁); >30(>=12岁)' },
-      { id: 'r2', name: 'R: 中度呼吸窘迫 (2级)', level: TriageLevel.L2, helperInfo: 'Paediatric CTAS 2级标准：60-70(<3月); 50-60(3-12月); 40-50(1-3岁); 30-40(4-11岁); 20-30(>=12岁)' },
-      { id: 'r3', name: 'R: 轻度呼吸窘迫 (3级)', level: TriageLevel.L3 },
-      { id: 'r4', name: 'SpO2 < 90% (1级)', level: TriageLevel.L1 },
-      { id: 'r5', name: 'SpO2 90% ~ 94% (2级)', level: TriageLevel.L2 }
+      { id: 'r1', name: '重度呼吸窘迫 (1级)', level: TriageLevel.L1, confirmMessage: '重度呼吸窘迫为 1 级：呼吸频率 (表 3:1 级)，发绀，脉速，反应差，吸气性三凹征，鼻扇，呻吟，呼吸音消失或减弱，单字或不说话，上气道梗阻，失去气道保护 (咳嗽、吞咽反射几乎消失)，肌张力低下' },
+      { id: 'r2', name: '呼吸停止/呼吸节律异常 (1级)', level: TriageLevel.L1 },
+      { id: 'r3', name: 'SpO2 < 90% (1级)', level: TriageLevel.L1 },
+      { id: 'r4', name: '危重哮喘急性发作 (1级)', level: TriageLevel.L1 },
+      { id: 'r5', name: '气道异物（气道不能维持） (1级)', level: TriageLevel.L1 },
+      { id: 'r6', name: '急性喉喘鸣伴Ⅲ°喉梗阻 (1级)', level: TriageLevel.L1 },
+      { id: 'r7', name: '中度呼吸窘迫 (2级)', level: TriageLevel.L2, confirmMessage: '中度呼吸窘迫为 2 级：明显气促 (表 3:2 级)，烦躁或易激惹，轻度吸气性三凹征，鼻扇，说短词或短句，呼气延长，喘鸣有气道保护' },
+      { id: 'r8', name: 'SpO2 ≤ 94% (2级)', level: TriageLevel.L2 },
+      { id: 'r9', name: '重度哮喘急性发作 (2级)', level: TriageLevel.L2 },
+      { id: 'r10', name: '气道异物（呼吸窘迫） (2级)', level: TriageLevel.L2 },
+      { id: 'r11', name: '明显急性喉喘鸣 (2级)', level: TriageLevel.L2 },
+      { id: 'r12', name: '轻度呼吸窘迫 (3级)', level: TriageLevel.L3, confirmMessage: '轻度呼吸窘迫为 3 级：气促 (表 3:3 级)，劳累后气短，呼吸做功无明显增强，说话成句，喘鸣无气道梗阻，时常咳嗽' },
+      { id: 'r13', name: 'SpO2 > 94% (3级)', level: TriageLevel.L3 },
+      { id: 'r14', name: '中度哮喘急性发作 (3级)', level: TriageLevel.L3 },
+      { id: 'r15', name: '气道异物（无呼吸窘迫） (3级)', level: TriageLevel.L3 },
+      { id: 'r16', name: '急性喉喘鸣 (3级)', level: TriageLevel.L3 },
+      { id: 'r17', name: '无呼吸窘迫 (4级)', level: TriageLevel.L4 },
+      { id: 'r18', name: '轻度哮喘急性发作 (4级)', level: TriageLevel.L4 }
     ]
   },
   {
     id: 'circ',
     name: '循环系统',
     symptoms: [
-      { id: 'c1', name: 'C: 失代偿性休克 (1级)', level: TriageLevel.L1, helperInfo: '心率异常极值伴血压下降、面色苍白/花斑、意识下降。' },
-      { id: 'c2', name: 'C: 代偿性休克 (2级)', level: TriageLevel.L2, helperInfo: '心率显著增快，CRT 3-5s，组织灌注延迟但血压尚可。' },
-      { id: 'c3', name: 'C: 心动过速/过缓伴血压正常 (3级)', level: TriageLevel.L3 },
-      { id: 'c4', name: '心搏骤停 (1级)', level: TriageLevel.L1 },
-      { id: 'c5', name: '活动性大出血 (2级)', level: TriageLevel.L2 }
+      { id: 'c1', name: '心搏骤停 (1级)', level: TriageLevel.L1 },
+      { id: 'c2', name: '严重心律失常 (1级)', level: TriageLevel.L1 },
+      { id: 'c3', name: '休克（失代偿） (1级)', level: TriageLevel.L1, confirmMessage: '失代偿性休克为 1 级，严重终末器官灌注不足表现：面色苍白、四肢湿冷、脉搏微弱、明显心动过速或心动过缓、低血压、通气不足或低氧、体位性晕厥、意识水平下降；也可表现为面色潮红、皮肤发干、肢端暖、脉压差大、烦躁，常见于感染性休克。低血压标准：新生儿收缩压 < 60mmHg，1~12 个月收缩压 < 70mmHg，1~10 岁收缩压 < (70 + 年龄 ×2) mmHg，>10 岁收缩压 < 90mmHg。' },
+      { id: 'c4', name: '心力衰竭 (2级)', level: TriageLevel.L2 },
+      { id: 'c5', name: '心律失常伴循环稳定 (2级)', level: TriageLevel.L2 },
+      { id: 'c6', name: '休克（代偿） (2级)', level: TriageLevel.L2, confirmMessage: '代偿性休克为 2 级：存在组织灌注不良表现如毛细血管充盈时间延长、心动过速、少尿和面色改变；因机体代偿，可表现为血压正常。' },
+      { id: 'c7', name: '严重胸痛、胸闷 (2级)', level: TriageLevel.L2, confirmMessage: '急性疼痛程度：剧烈 / 严重疼痛 7~10 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
+      { id: 'c8', name: '高血压伴惊厥、昏迷 (2级)', level: TriageLevel.L2 },
+      { id: 'c9', name: '急性心动过速/过缓伴血压正常 (3级)', level: TriageLevel.L3, confirmMessage: '心动过速 / 过缓伴血压正常为 3 级：心率与正常值相差 +/-2 标准差。' },
+      { id: 'c10', name: '明显胸痛 (3级)', level: TriageLevel.L3, confirmMessage: '急性疼痛程度：中度疼痛 4~6 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
+      { id: 'c11', name: '循环稳定 (4级)', level: TriageLevel.L4 },
+      { id: 'c12', name: '胸痛 (4级)', level: TriageLevel.L4, confirmMessage: '急性疼痛程度：轻度疼痛 1~3 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
+      { id: 'c13', name: '循环稳定 (5级)', level: TriageLevel.L5 }
     ]
   },
   {
     id: 'gi',
-    name: '消化系统',
+    name: '消化/泌尿系统',
     symptoms: [
       { id: 'gi1', name: '消化道大出血 (1级)', level: TriageLevel.L1 },
-      { id: 'gi2', name: '频繁呕吐/重度脱水 (2级)', level: TriageLevel.L2 },
-      { id: 'gi3', name: '轻度脱水 (3级)', level: TriageLevel.L3 },
-      { id: 'gi4', name: '急性腹痛 (疑似急腹症) (3级)', level: TriageLevel.L3 }
+      { id: 'gi2', name: '腹泻、呕吐伴重度脱水/重度脱水，并有生命体征异常 (2级)', level: TriageLevel.L2 },
+      { id: 'gi3', name: '活动性消化道出血 (2级)', level: TriageLevel.L2 },
+      { id: 'gi4', name: '明显腹胀/呕吐/急性腹痛伴生命征异常 (2级)', level: TriageLevel.L2 },
+      { id: 'gi5', name: '消化道异物（性质部位不明/食道/有症状） (2级)', level: TriageLevel.L2 },
+      { id: 'gi6', name: '急性肾功能衰竭 (2级)', level: TriageLevel.L2 },
+      { id: 'gi7', name: '腹泻、呕吐伴中度脱水 (3级)', level: TriageLevel.L3 },
+      { id: 'gi8', name: '急性消化道出血 (3级)', level: TriageLevel.L3 },
+      { id: 'gi9', name: '持续或胆汁性呕吐/急性腹痛 (3级)', level: TriageLevel.L3 },
+      { id: 'gi10', name: '少尿 (3级)', level: TriageLevel.L3 },
+      { id: 'gi11', name: '腹泻、呕吐伴轻度脱水 (4级)', level: TriageLevel.L4 },
+      { id: 'gi12', name: '腹泻、呕吐不伴脱水 (5级)', level: TriageLevel.L5 }
     ]
   },
   {
     id: 'surg',
-    name: '外科/创伤',
+    name: '外科/骨科',
     symptoms: [
-      { id: 's1', name: '严重创伤/PTS<=8分 (1级)', level: TriageLevel.L1 },
-      { id: 's2', name: '骨筋膜室综合征 (2级)', level: TriageLevel.L2 },
-      { id: 's3', name: '开放性骨折 (2级)', level: TriageLevel.L2 },
-      { id: 's4', name: '单纯骨折 (3级)', level: TriageLevel.L3 }
+      { id: 's1', name: '严重多发伤 (1级)', level: TriageLevel.L1 },
+      { id: 's2', name: '脏器穿透伤或钝伤合并休克 (1级)', level: TriageLevel.L1 },
+      { id: 's3', name: '四肢离断伤/指趾端离断伤 (1级)', level: TriageLevel.L1 },
+      { id: 's4', name: '重度烧烫伤伴休克（大于25%体表面积或累及气道） (1级)', level: TriageLevel.L1 },
+      { id: 's5', name: '血管神经受累的骨筋膜室综合征 (2级)', level: TriageLevel.L2 },
+      { id: 's6', name: '眼外伤眼球损伤 (2级)', level: TriageLevel.L2 },
+      { id: 's7', name: '血管神经受累的开放性骨折 (2级)', level: TriageLevel.L2 },
+      { id: 's8', name: 'Ⅱ°烧烫伤（＞10%体表面积或面、手足受累） (2级)', level: TriageLevel.L2 },
+      { id: 's9', name: '严重睾丸疼痛 (2级)', level: TriageLevel.L2, confirmMessage: '急性疼痛程度：剧烈 / 严重疼痛 7~10 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
+      { id: 's10', name: '单侧撕裂伤 (3级)', level: TriageLevel.L3 },
+      { id: 's11', name: '血管神经未受累的骨折 (3级)', level: TriageLevel.L3 },
+      { id: 's12', name: 'Ⅱ°烧烫伤（＜10%体表面积） (3级)', level: TriageLevel.L3 },
+      { id: 's13', name: '睾丸疼痛或肿胀/阴囊外伤 (3级)', level: TriageLevel.L3, confirmMessage: '急性疼痛程度：中度疼痛 4~6 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
+      { id: 's14', name: '腹股沟肿块 (3级)', level: TriageLevel.L3 },
+      { id: 's15', name: 'Ⅰ°烧烫伤 (4级)', level: TriageLevel.L4 }
     ]
   },
   {
     id: 'allergy',
     name: '过敏反应',
     symptoms: [
-      { id: 'a1', name: '严重过敏性休克 (1级)', level: TriageLevel.L1, helperInfo: '暴露过敏原后数分钟至数小时出现生命体征不稳定、意识障碍、气道水肿或休克表现。' },
-      { id: 'a2', name: '严重皮疹伴呼吸/循环异常 (2级)', level: TriageLevel.L2, helperInfo: '广泛皮疹合并喉头紧缩感、喘鸣、气促或轻度血压下降。' },
-      { id: 'a3', name: '严重皮疹伴剧烈腹痛/呕吐 (2级)', level: TriageLevel.L2, helperInfo: '提示胃肠道系统受累。' },
-      { id: 'a4', name: '广泛皮疹伴局部肿胀 (3级)', level: TriageLevel.L3, helperInfo: '生命体征平稳，无系统性受累表现。' }
+      { id: 'a1', name: '呼吸窘迫 (1级)', level: TriageLevel.L1 },
+      { id: 'a2', name: '过敏性休克 (1级)', level: TriageLevel.L1, actionType: 'epinephrine_calc', confirmMessage: '过敏性休克为 1 级。严重过敏反应伴有血压下降或组织灌注不良。' },
+      { id: 'a3', name: '皮肤黏膜广泛皮疹（口唇、结膜） (2级)', level: TriageLevel.L2 },
+      { id: 'a4', name: '面部广泛肿胀 (2级)', level: TriageLevel.L2 },
+      { id: 'a5', name: '剧烈腹痛、持续呕吐 (2级)', level: TriageLevel.L2 },
+      { id: 'a6', name: '广泛皮疹 (3级)', level: TriageLevel.L3 },
+      { id: 'a7', name: '局部皮疹、肿胀 (4级)', level: TriageLevel.L4 }
     ]
   },
   {
     id: 'blood',
-    name: '血液/代谢',
+    name: '血液系统',
     symptoms: [
-      { id: 'b1', name: '凝血障碍伴活动性出血 (1级)', level: TriageLevel.L1 },
-      { id: 'b2', name: '血小板极低伴出血倾向 (2级)', level: TriageLevel.L2 },
-      { id: 'b3', name: '低血糖伴意识改变 (2级)', level: TriageLevel.L2 },
-      { id: 'b4', name: 'DKA 糖尿病酮症酸中毒 (2级)', level: TriageLevel.L2 }
+      { id: 'b1', name: '凝血功能障碍伴全身性大出血 (1级)', level: TriageLevel.L1 },
+      { id: 'b2', name: '血小板＜20×10^9/L伴活动性出血 (2级)', level: TriageLevel.L2 },
+      { id: 'b3', name: '血小板＜20×10^9/L不伴活动性出血 (3级)', level: TriageLevel.L3 }
     ]
   },
   {
-    id: 'toxic',
-    name: '中毒/环境',
+    id: 'other',
+    name: '其他',
     symptoms: [
-      { id: 'o1', name: '中毒伴生命体征不稳定 (1级)', level: TriageLevel.L1 },
-      { id: 'o2', name: '溺水 / 触电 (1级)', level: TriageLevel.L1 },
-      { id: 'o3', name: '急性中毒 (体征稳定) (2级)', level: TriageLevel.L2 },
-      { id: 'o4', name: '动物咬伤伴全身症状 (2级)', level: TriageLevel.L2 }
+      { id: 'o1', name: '溺水、中毒、触电伴生命体征不稳定 (1级)', level: TriageLevel.L1 },
+      { id: 'o2', name: '活动性大出血 (1级)', level: TriageLevel.L1 },
+      { id: 'o3', name: '重度贫血 (2级)', level: TriageLevel.L2 },
+      { id: 'o4', name: '中度或药物超量 (2级)', level: TriageLevel.L2 },
+      { id: 'o5', name: '动物咬伤伴全身中毒症状 (2级)', level: TriageLevel.L2 },
+      { id: 'o6', name: '糖尿病酮症酸中毒或低血糖 (2级)', level: TriageLevel.L2 },
+      { id: 'o7', name: '活动性出血 (2级)', level: TriageLevel.L2 },
+      { id: 'o8', name: '糖尿病（高血糖伴呕吐、腹痛） (3级)', level: TriageLevel.L3 }
     ]
   }
 ];
+
+export const GCS_CONFIG = {
+  eye: [
+    { score: 4, label: '自发睁眼 (Spontaneous)' },
+    { score: 3, label: '语言吩咐睁眼 (To speech)' },
+    { score: 2, label: '疼痛刺激睁眼 (To pain)' },
+    { score: 1, label: '无睁眼 (None)' },
+  ],
+  verbal: [
+    { score: 5, label: '啼哭、清醒、正常互动 (Appropriate coo/cry)' },
+    { score: 4, label: '啼哭、可安抚、互动减少 (Consolable crying)' },
+    { score: 3, label: '不适当的啼哭、哭闹 (Inappropriate/irritable cry)' },
+    { score: 2, label: '仅能发出呻吟声 (Moaning)' },
+    { score: 1, label: '无发音 (None)' },
+  ],
+  motor: [
+    { score: 6, label: '按吩咐动作 (Obeys commands)' },
+    { score: 5, label: '对疼痛定位反应 (Localizes pain)' },
+    { score: 4, label: '对疼痛刺激屈曲撤退 (Withdraws from pain)' },
+    { score: 3, label: '异常屈曲反应 (去皮层状态)' },
+    { score: 2, label: '异常伸展反应 (去脑状态)' },
+    { score: 1, label: '无反应 (None)' },
+  ]
+};
+
+export const PTS_CONFIG = {
+  size: [
+    { score: 2, label: '> 20 kg' },
+    { score: 1, label: '10 - 20 kg' },
+    { score: -1, label: '< 10 kg' }
+  ],
+  airway: [
+    { score: 2, label: '正常' },
+    { score: 1, label: '可维持' },
+    { score: -1, label: '不可维持' }
+  ],
+  sbp: [
+    { score: 2, label: '> 90 mmHg (或脉搏正常)' },
+    { score: 1, label: '50 - 90 mmHg (或脉搏微弱)' },
+    { score: -1, label: '< 50 mmHg (或无脉搏)' }
+  ],
+  cns: [
+    { score: 2, label: '清醒' },
+    { score: 1, label: '迟钝/意识丧失' },
+    { score: -1, label: '昏迷/去大脑强直' }
+  ],
+  skeletal: [
+    { score: 2, label: '无骨折' },
+    { score: 1, label: '闭合性骨折' },
+    { score: -1, label: '开放性/多发骨折' }
+  ],
+  cutaneous: [
+    { score: 2, label: '无损伤' },
+    { score: 1, label: '轻微伤' },
+    { score: -1, label: '严重/穿透伤' }
+  ]
+};
 
 export const TRIAGE_RESULT_CONFIG: Record<TriageLevel, TriageResult> = {
   [TriageLevel.L1]: {

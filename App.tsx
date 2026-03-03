@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { TRIAGE_CATEGORIES, TRIAGE_RESULT_CONFIG, HIGH_RISK_FACTORS } from './constants';
+import { TRIAGE_CATEGORIES, TRIAGE_RESULT_CONFIG, HIGH_RISK_FACTORS, GCS_CONFIG, PTS_CONFIG } from './constants';
 import { TriageLevel, PatientState, TriageResult, VitalSigns, Symptom } from './types';
 import { getAIClinicalReport } from './services/geminiService';
 
@@ -18,19 +18,30 @@ const App: React.FC = () => {
 
   // GCS Calculator State
   const [gcsE, setGcsE] = useState<number>(4);
-  const [gcsV, setGcsV] = useState<number>(5);
+  const [gcsV, setGcsV] = useState<number | 'T'>(5);
   const [gcsM, setGcsM] = useState<number>(6);
-  const gcsTotal = useMemo(() => gcsE + gcsV + gcsM, [gcsE, gcsV, gcsM]);
+  const gcsTotal = useMemo(() => {
+    const vScore = gcsV === 'T' ? 1 : gcsV;
+    return gcsE + vScore + gcsM;
+  }, [gcsE, gcsV, gcsM]);
 
   // PTS Calculator State
-  const [ptsWeight, setPtsWeight] = useState<number>(2);
+  const [ptsSize, setPtsSize] = useState<number>(2);
   const [ptsAirway, setPtsAirway] = useState<number>(2);
-  const [ptsBP, setPtsBP] = useState<number>(2);
-  const [ptsCNS, setPtsCNS] = useState<number>(2);
-  const [ptsWound, setPtsWound] = useState<number>(2);
-  const [ptsFracture, setPtsFracture] = useState<number>(2);
-  const ptsTotal = useMemo(() => ptsWeight + ptsAirway + ptsBP + ptsCNS + ptsWound + ptsFracture, 
-    [ptsWeight, ptsAirway, ptsBP, ptsCNS, ptsWound, ptsFracture]);
+  const [ptsSbp, setPtsSbp] = useState<number>(2);
+  const [ptsCns, setPtsCns] = useState<number>(2);
+  const [ptsSkeletal, setPtsSkeletal] = useState<number>(2);
+  const [ptsCutaneous, setPtsCutaneous] = useState<number>(2);
+  const ptsTotal = useMemo(() => {
+    return ptsSize + ptsAirway + ptsSbp + ptsCns + ptsSkeletal + ptsCutaneous;
+  }, [ptsSize, ptsAirway, ptsSbp, ptsCns, ptsSkeletal, ptsCutaneous]);
+
+  const gcsClinicalSignificance = useMemo(() => {
+    if (gcsTotal === 15) return { label: '清醒', color: 'text-emerald-600' };
+    if (gcsTotal >= 13) return { label: '轻度', color: 'text-amber-600' };
+    if (gcsTotal >= 9) return { label: '中度', color: 'text-orange-600' };
+    return { label: '重度 (严重脑损伤)', color: 'text-rose-600' };
+  }, [gcsTotal]);
 
   const handleAgeChange = (field: keyof Pick<PatientState, 'ageYears' | 'ageMonths' | 'ageDays'>, value: string) => {
     if (value !== '' && !/^\d+$/.test(value)) return;
@@ -59,7 +70,7 @@ const App: React.FC = () => {
       });
       return;
     }
-    if (symptom.helperInfo) {
+    if (symptom.confirmMessage || symptom.helperInfo) {
       setConfirmingSymptom(symptom);
     } else {
       executeToggleSymptom(symptom.id);
@@ -75,6 +86,13 @@ const App: React.FC = () => {
     setAiReport(null);
     setConfirmingSymptom(null);
   };
+
+  const ptsClinicalSignificance = useMemo(() => {
+    if (ptsTotal >= 9) return { label: '轻度创伤', color: 'text-emerald-600', desc: '9-12分：轻度创伤' };
+    if (ptsTotal >= 6) return { label: '潜在生命危险', color: 'text-amber-600', desc: '6-8分：潜在生命危险 (注：<8分死亡风险显著增加)' };
+    if (ptsTotal >= 0) return { label: '有生命危险', color: 'text-rose-600', desc: '0-5分：有生命危险 (注：<8分死亡风险显著增加)' };
+    return { label: '多数死亡', color: 'text-slate-900', desc: '<0分：多数死亡 (注：<8分死亡风险显著增加)' };
+  }, [ptsTotal]);
 
   const applyGcsToTriage = () => {
     setPatient(prev => {
@@ -149,16 +167,56 @@ const App: React.FC = () => {
     const spo2 = parseFloat(patient.vitals.spo2);
     const crt = parseFloat(patient.vitals.crt);
 
+    // Age Logic
+    const hasAgeInput = patient.ageYears !== '' || patient.ageMonths !== '' || patient.ageDays !== '';
+    if (hasAgeInput) {
+      if (years === 0 && months === 0 && days <= 1) {
+        reasons.push("A: ≤24h新生儿 (2级)");
+      } else if (totalMonths <= 3) {
+        reasons.push("A: ≤3月婴儿 (3级)");
+      } else if (totalMonths > 3 && years === 0) {
+        reasons.push("A: >3月婴儿 (4级)");
+      }
+    }
+
+    // Temperature (T) Logic - New Bug Fix
+    if (t > 0) {
+      // 1级：高热伴惊厥发作为1级 (n3是惊厥发作)
+      if (t >= 39 && patient.selectedSymptoms.has('n3')) {
+        reasons.push("V: 高热伴惊厥发作 (1级)");
+      }
+      // 2级：≥41 ℃ 或 ≤35 ℃
+      else if (t >= 41 || t <= 35) {
+        reasons.push("V: 体温极值 (2级)");
+      }
+      // 3级：≥39 ℃
+      else if (t >= 39) {
+        reasons.push("V: 体温 ≥ 39℃ (3级)");
+      }
+      // 4级：≥38.5 ℃
+      else if (t >= 38.5) {
+        reasons.push("V: 体温 ≥ 38.5℃ (4级)");
+      }
+      // 5级：> 38 ℃
+      else if (t > 38) {
+        reasons.push("V: 体温 > 38℃ (5级)");
+      }
+    }
+
     // SpO2 Logic
     if (spo2 > 0) {
       if (spo2 < 90) reasons.push("V: SpO2 < 90% (1级)");
       else if (spo2 <= 94) reasons.push("V: SpO2 90-94% (2级)");
+      else if (spo2 <= 97) reasons.push("V: SpO2 95-97% (3级)");
+      else reasons.push("V: SpO2 98-100% (4级)");
     }
     
     // CRT Logic
     if (crt > 0) {
       if (crt > 5) reasons.push("C: CRT > 5s (1级)");
       else if (crt >= 3) reasons.push("C: CRT 3-5s (2级)");
+      else if (crt >= 2) reasons.push("C: CRT 2-3s (3级)");
+      else reasons.push("C: CRT < 2s (4级)");
     }
 
     // BP (Hypotension) Logic
@@ -171,58 +229,75 @@ const App: React.FC = () => {
       if (isHypo) reasons.push("C: 低血压 (1级)");
     }
 
-    // Respiratory Rate (RR) Logic - Paediatric CTAS
-    if (rr > 0) {
+    // RR Logic
+    if (rr > 0 && hasAgeInput) {
       if (totalMonths < 3) {
-        if (rr > 70) reasons.push("R: 呼吸过速 > 70 (1级)");
-        else if (rr >= 60) reasons.push("R: 呼吸过速 60-70 (2级)");
-        else if (rr >= 50) reasons.push("R: 呼吸过速 50-60 (3级)");
+        if (rr > 70 || rr < 10) reasons.push(`R: 呼吸异常 ${rr} (1级)`);
+        else if (rr >= 60 || rr < 15) reasons.push(`R: 呼吸异常 ${rr} (2级)`);
+        else if (rr >= 50 || rr < 20) reasons.push(`R: 呼吸异常 ${rr} (3级)`);
+        else if (rr >= 40) reasons.push(`R: 呼吸轻度增快 ${rr} (4级)`);
+        else reasons.push(`R: 呼吸正常 ${rr} (5级)`);
       } else if (totalMonths < 12) {
-        if (rr > 60) reasons.push("R: 呼吸过速 > 60 (1级)");
-        else if (rr >= 50) reasons.push("R: 呼吸过速 50-60 (2级)");
-        else if (rr >= 40) reasons.push("R: 呼吸过速 40-50 (3级)");
-      } else if (years >= 1 && years <= 3) {
-        if (rr > 50) reasons.push("R: 呼吸过速 > 50 (1级)");
-        else if (rr >= 40) reasons.push("R: 呼吸过速 40-50 (2级)");
-        else if (rr >= 30) reasons.push("R: 呼吸过速 30-40 (3级)");
-      } else if (years >= 4 && years <= 11) {
-        if (rr > 40) reasons.push("R: 呼吸过速 > 40 (1级)");
-        else if (rr >= 30) reasons.push("R: 呼吸过速 30-40 (2级)");
-        else if (rr >= 20) reasons.push("R: 呼吸过速 20-30 (3级)");
-      } else if (years >= 12) {
-        if (rr > 30) reasons.push("R: 呼吸过速 > 30 (1级)");
-        else if (rr >= 20) reasons.push("R: 呼吸过速 20-30 (2级)");
-        else if (rr >= 15) reasons.push("R: 呼吸过速 15-20 (3级)");
+        if (rr > 60 || rr < 10) reasons.push(`R: 呼吸异常 ${rr} (1级)`);
+        else if (rr >= 50 || rr < 15) reasons.push(`R: 呼吸异常 ${rr} (2级)`);
+        else if (rr >= 40 || rr < 20) reasons.push(`R: 呼吸异常 ${rr} (3级)`);
+        else if (rr >= 30) reasons.push(`R: 呼吸轻度增快 ${rr} (4级)`);
+        else reasons.push(`R: 呼吸正常 ${rr} (5级)`);
+      } else if (totalMonths < 48) { // 1-3 years
+        if (rr > 50 || rr < 10) reasons.push(`R: 呼吸异常 ${rr} (1级)`);
+        else if (rr >= 40 || rr < 15) reasons.push(`R: 呼吸异常 ${rr} (2级)`);
+        else if (rr >= 30 || rr < 20) reasons.push(`R: 呼吸异常 ${rr} (3级)`);
+        else if (rr >= 25) reasons.push(`R: 呼吸轻度增快 ${rr} (4级)`);
+        else reasons.push(`R: 呼吸正常 ${rr} (5级)`);
+      } else if (totalMonths < 144) { // 4-11 years
+        if (rr > 40 || rr < 8) reasons.push(`R: 呼吸异常 ${rr} (1级)`);
+        else if (rr >= 30 || rr < 12) reasons.push(`R: 呼吸异常 ${rr} (2级)`);
+        else if (rr >= 20 || rr < 15) reasons.push(`R: 呼吸异常 ${rr} (3级)`);
+        else if (rr >= 18) reasons.push(`R: 呼吸轻度增快 ${rr} (4级)`);
+        else reasons.push(`R: 呼吸正常 ${rr} (5级)`);
+      } else { // >= 12 years
+        if (rr > 30 || rr < 8) reasons.push(`R: 呼吸异常 ${rr} (1级)`);
+        else if (rr >= 20 || rr < 12) reasons.push(`R: 呼吸异常 ${rr} (2级)`);
+        else if (rr >= 15 || rr < 14) reasons.push(`R: 呼吸异常 ${rr} (3级)`);
+        else if (rr >= 13) reasons.push(`R: 呼吸轻度增快 ${rr} (4级)`);
+        else reasons.push(`R: 呼吸正常 ${rr} (5级)`);
       }
     }
 
-    // Heart Rate (HR) Logic - Paediatric CTAS
-    if (hr > 0) {
+    // HR Logic
+    if (hr > 0 && hasAgeInput) {
       if (totalMonths < 3) {
         if (hr > 210 || hr < 80) reasons.push(`H: 心率异常 ${hr} (1级)`);
-        else if (hr >= 180) reasons.push(`H: 心率增快 ${hr} (2级)`);
-        else if (hr >= 110) reasons.push(`H: 心率增快 ${hr} (3级)`);
+        else if (hr >= 180 || hr < 90) reasons.push(`H: 心率异常 ${hr} (2级)`);
+        else if (hr >= 110 || hr < 100) reasons.push(`H: 心率异常 ${hr} (3级)`);
+        else if (hr >= 100) reasons.push(`H: 心率轻度增快 ${hr} (4级)`);
+        else reasons.push(`H: 心率正常 ${hr} (5级)`);
       } else if (totalMonths < 12) {
         if (hr > 190 || hr < 80) reasons.push(`H: 心率异常 ${hr} (1级)`);
-        else if (hr >= 170) reasons.push(`H: 心率增快 ${hr} (2级)`);
-        else if (hr >= 110) reasons.push(`H: 心率增快 ${hr} (3级)`);
-      } else if (years >= 1 && years <= 3) {
+        else if (hr >= 170 || hr < 90) reasons.push(`H: 心率异常 ${hr} (2级)`);
+        else if (hr >= 110 || hr < 100) reasons.push(`H: 心率异常 ${hr} (3级)`);
+        else if (hr >= 100) reasons.push(`H: 心率轻度增快 ${hr} (4级)`);
+        else reasons.push(`H: 心率正常 ${hr} (5级)`);
+      } else if (totalMonths < 48) { // 1-3 years
         if (hr > 180 || hr < 80) reasons.push(`H: 心率异常 ${hr} (1级)`);
-        else if (hr >= 150) reasons.push(`H: 心率增快 ${hr} (2级)`);
-        else if (hr >= 100) reasons.push(`H: 心率增快 ${hr} (3级)`);
-      } else if (years >= 4 && years <= 11) {
+        else if (hr >= 150 || hr < 90) reasons.push(`H: 心率异常 ${hr} (2级)`);
+        else if (hr >= 100 || hr < 100) reasons.push(`H: 心率异常 ${hr} (3级)`);
+        else if (hr >= 90) reasons.push(`H: 心率轻度增快 ${hr} (4级)`);
+        else reasons.push(`H: 心率正常 ${hr} (5级)`);
+      } else if (totalMonths < 144) { // 4-11 years
         if (hr > 160 || hr < 60) reasons.push(`H: 心率异常 ${hr} (1级)`);
-        else if (hr >= 130) reasons.push(`H: 心率增快 ${hr} (2级)`);
-        else if (hr >= 70) reasons.push(`H: 心率增快 ${hr} (3级)`);
-      } else if (years >= 12) {
+        else if (hr >= 130 || hr < 65) reasons.push(`H: 心率异常 ${hr} (2级)`);
+        else if (hr >= 70 || hr < 70) reasons.push(`H: 心率异常 ${hr} (3级)`);
+        else if (hr >= 65) reasons.push(`H: 心率轻度增快 ${hr} (4级)`);
+        else reasons.push(`H: 心率正常 ${hr} (5级)`);
+      } else { // >= 12 years
         if (hr > 140 || hr < 50) reasons.push(`H: 心率异常 ${hr} (1级)`);
-        else if (hr >= 110) reasons.push(`H: 心率增快 ${hr} (2级)`);
-        else if (hr >= 60) reasons.push(`H: 心率增快 ${hr} (3级)`);
+        else if (hr >= 110 || hr < 55) reasons.push(`H: 心率异常 ${hr} (2级)`);
+        else if (hr >= 60 || hr < 60) reasons.push(`H: 心率异常 ${hr} (3级)`);
+        else if (hr >= 55) reasons.push(`H: 心率轻度增快 ${hr} (4级)`);
+        else reasons.push(`H: 心率正常 ${hr} (5级)`);
       }
     }
-    
-    if (t >= 41 || t < 35) reasons.push("V: 体温极值 (2级)");
-    if (totalMonths < 3 && t >= 38) reasons.push("V: <3月龄发热 (2级)");
 
     patient.selectedSymptoms.forEach(id => {
       TRIAGE_CATEGORIES.forEach(cat => {
@@ -254,6 +329,7 @@ const App: React.FC = () => {
     if (triageReason.some(r => r.includes("(1级)"))) baseLevel = Math.min(baseLevel, 1);
     else if (triageReason.some(r => r.includes("(2级)"))) baseLevel = Math.min(baseLevel, 2);
     else if (triageReason.some(r => r.includes("(3级)"))) baseLevel = Math.min(baseLevel, 3);
+    else if (triageReason.some(r => r.includes("(4级)"))) baseLevel = Math.min(baseLevel, 4);
 
     // 风险升级逻辑
     const shouldUpgrade = Array.from(patient.highRiskFactors).some(id => 
@@ -282,10 +358,6 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen p-4 md:p-8 flex flex-col items-center max-w-5xl mx-auto font-sans text-slate-900 bg-[#f8faff] selection:bg-indigo-100">
       
-      {/* Dynamic Background */}
-      <div className="fixed top-[-10%] right-[-10%] w-[60%] h-[60%] bg-blue-100/30 blur-[120px] rounded-full z-0 pointer-events-none"></div>
-      <div className="fixed bottom-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-100/30 blur-[120px] rounded-full z-0 pointer-events-none"></div>
-
       {/* Helper Modal */}
       {confirmingSymptom && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-in fade-in duration-300">
@@ -296,351 +368,147 @@ const App: React.FC = () => {
             </div>
             <div className="p-8">
               <p className="text-base font-black text-slate-800 mb-4">{confirmingSymptom.name}</p>
-              <div className="p-5 bg-black/5 rounded-[24px] mb-8 text-[11px] font-semibold text-slate-500 leading-relaxed italic">
-                {confirmingSymptom.helperInfo}
+              <div className="p-5 bg-black/5 rounded-[24px] mb-6 text-[11px] font-semibold text-slate-500 leading-relaxed italic">
+                {confirmingSymptom.confirmMessage || confirmingSymptom.helperInfo}
               </div>
-              <div className="flex gap-3">
-                <button onClick={() => setConfirmingSymptom(null)} className="flex-1 py-4 bg-white/60 text-slate-500 rounded-2xl text-sm font-bold border border-white transition-all active:scale-95">取消</button>
-                <button onClick={() => executeToggleSymptom(confirmingSymptom.id)} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 transition-all active:scale-95">确认符合</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Reference Calculators Modal */}
-      {showRefTable && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/10 backdrop-blur-xl animate-in zoom-in-95 duration-300">
-          <div className="bg-white/80 backdrop-blur-3xl rounded-[40px] w-full max-w-2xl max-h-[85vh] shadow-2xl overflow-hidden flex flex-col border border-white/60 ring-1 ring-black/5">
-            <div className="p-8 flex items-center justify-between border-b border-white/40">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-indigo-600 rounded-[22px] flex items-center justify-center shadow-lg">
-                  <i className={`fas ${showRefTable === 'gcs' ? 'fa-brain' : showRefTable === 'pts' ? 'fa-user-injured' : 'fa-table'} text-white text-xl`}></i>
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-slate-800 tracking-tight">
-                    {showRefTable === 'gcs' ? 'P-GCS 改良评分' : showRefTable === 'pts' ? 'PTS 小儿创伤评分' : 'Paediatric CTAS 共识参考'}
-                  </h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Automated Clinical Scoring Tool</p>
-                </div>
-              </div>
-              <button onClick={() => setShowRefTable(null)} className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all"><i className="fas fa-times"></i></button>
-            </div>
-
-            <div className="p-8 overflow-y-auto custom-scrollbar flex-1">
-              {showRefTable === 'gcs' ? (
-                <div className="space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {[
-                      { key: 'E', label: '睁眼', state: gcsE, setter: setGcsE, options: [{s:4,l:'自发'},{s:3,l:'语音'},{s:2,l:'疼痛'},{s:1,l:'无'}] },
-                      { key: 'V', label: '语言', state: gcsV, setter: setGcsV, options: [{s:5,l:'笑/搜声'},{s:4,l:'不安'},{s:3,l:'痛哭'},{s:2,l:'呻吟'},{s:1,l:'无'}] },
-                      { key: 'M', label: '运动', state: gcsM, setter: setGcsM, options: [{s:6,l:'自发'},{s:5,l:'定位'},{s:4,l:'撤退'},{s:3,l:'屈曲'},{s:2,l:'伸展'},{s:1,l:'无'}] },
-                    ].map(cat => (
-                      <div key={cat.key} className="space-y-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-[10px] font-black">{cat.key}</span>
-                          <span className="text-xs font-bold text-slate-500">{cat.label}</span>
-                        </div>
-                        {cat.options.map(opt => (
-                          <button key={opt.s} onClick={() => cat.setter(opt.s)} className={`w-full p-4 rounded-2xl text-[11px] font-bold border transition-all flex justify-between items-center ${cat.state === opt.s ? 'bg-indigo-600 text-white border-indigo-600 shadow-md translate-y-[-2px]' : 'bg-white/60 border-slate-100 text-slate-600 hover:border-indigo-200'}`}>
-                            <span>{opt.l}</span><span className="opacity-50">{opt.s}</span>
-                          </button>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="bg-slate-900 rounded-[32px] p-8 text-white flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-slate-400 mb-1">GCS 总分评估</p>
-                      <div className="text-5xl font-black">{gcsTotal} <span className="text-lg opacity-30">/ 15</span></div>
+              
+              {confirmingSymptom.actionType === 'epinephrine_calc' && (
+                <div className="mb-8 p-5 bg-rose-50 border border-rose-100 rounded-[24px]">
+                  <h4 className="text-rose-800 font-bold mb-2 flex items-center gap-2">
+                    <i className="fas fa-syringe"></i> 肾上腺素 (1:1000) 剂量计算
+                  </h4>
+                  {patient.weight ? (
+                    <div className="text-sm text-rose-700">
+                      <p>体重: <strong>{patient.weight} kg</strong></p>
+                      <p>推荐剂量 (0.01mg/kg): <strong className="text-lg">{Math.min(parseFloat(patient.weight) * 0.01, 0.5).toFixed(2)} mg</strong></p>
+                      <p className="text-xs mt-1 opacity-80">(单次最大剂量 0.5mg，大腿前外侧肌肉注射)</p>
                     </div>
-                    <button onClick={applyGcsToTriage} className="px-10 py-5 bg-indigo-500 hover:bg-indigo-400 rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all">同步至分诊结果</button>
-                  </div>
-                </div>
-              ) : showRefTable === 'pts' ? (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {[
-                      { label: '体重 (kg)', state: ptsWeight, setter: setPtsWeight, opts: [{v:2,l:'>20'},{v:1,l:'10-20'},{v:-1,l:'<10'}] },
-                      { label: '气道情况', state: ptsAirway, setter: setPtsAirway, opts: [{v:2,l:'正常'},{v:1,l:'可维持'},{v:-1,l:'受阻'}] },
-                      { label: '收缩压', state: ptsBP, setter: setPtsBP, opts: [{v:2,l:'>90'},{v:1,l:'50-90'},{v:-1,l:'<50'}] },
-                      { label: '中枢神经', state: ptsCNS, setter: setPtsCNS, opts: [{v:2,l:'清醒'},{v:1,l:'迟钝'},{v:-1,l:'昏迷'}] },
-                      { label: '伤口类型', state: ptsWound, setter: setPtsWound, opts: [{v:2,l:'无'},{v:1,l:'轻微'},{v:-1,l:'严重'}] },
-                      { label: '骨折情况', state: ptsFracture, setter: setPtsFracture, opts: [{v:2,l:'无'},{v:1,l:'单处'},{v:-1,l:'多处'}] },
-                    ].map(group => (
-                      <div key={group.label} className="bg-slate-50/50 p-6 rounded-[28px] border border-white/40 shadow-inner">
-                        <p className="text-xs font-black text-slate-400 mb-4 uppercase">{group.label}</p>
-                        <div className="grid grid-cols-1 gap-2">
-                          {group.opts.map(opt => (
-                            <button key={opt.v} onClick={() => group.setter(opt.v)} className={`w-full p-3 rounded-xl text-[10px] font-bold border transition-all flex justify-between items-center ${group.state === opt.v ? 'bg-rose-500 text-white border-rose-500 shadow-md' : 'bg-white border-slate-100 text-slate-600 hover:border-rose-200'}`}>
-                              <span>{opt.l}</span><span>{opt.v > 0 ? `+${opt.v}` : opt.v}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="bg-slate-900 rounded-[32px] p-8 text-white flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">PTS 创伤评估</p>
-                      <div className="text-5xl font-black">{ptsTotal} <span className="text-lg opacity-30">/ 12</span></div>
+                  ) : (
+                    <div className="text-sm text-rose-600">
+                      <i className="fas fa-exclamation-circle mr-1"></i> 请先在上方输入患儿体重以计算推荐剂量。
                     </div>
-                    <button onClick={applyPtsToTriage} className="px-10 py-5 bg-rose-500 hover:bg-rose-400 rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all">同步分诊</button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-10 py-4">
-                  {/* Paediatric CTAS Table Ref */}
-                  <div>
-                    <h4 className="text-sm font-black text-indigo-600 mb-6 flex items-center gap-3">
-                      <div className="w-1.5 h-4 bg-indigo-600 rounded"></div>
-                      Paediatric CTAS 呼吸频率分级 (次/min)
-                    </h4>
-                    <div className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
-                      <table className="w-full text-[10px] text-left">
-                        <thead className="bg-slate-50">
-                          <tr>
-                            <th className="p-4 border-b font-black text-slate-500 uppercase">年龄</th>
-                            <th className="p-4 border-b font-black text-rose-600 uppercase">1级 (危急)</th>
-                            <th className="p-4 border-b font-black text-orange-600 uppercase">2级 (危重)</th>
-                            <th className="p-4 border-b font-black text-amber-600 uppercase">3级 (急症)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {[
-                            { a: '<3月', l1: '>70', l2: '60-70', l3: '50-60' },
-                            { a: '3-12月', l1: '>60', l2: '50-60', l3: '40-50' },
-                            { a: '1-3岁', l1: '>50', l2: '40-50', l3: '30-40' },
-                            { a: '4-11岁', l1: '>40', l2: '30-40', l3: '20-30' },
-                            { a: '≥12岁', l1: '>30', l2: '20-30', l3: '15-20' }
-                          ].map(row => (
-                            <tr key={row.a} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="p-4 font-black text-slate-700">{row.a}</td>
-                              <td className="p-4 font-bold text-rose-600/80">{row.l1}</td>
-                              <td className="p-4 font-bold text-orange-600/80">{row.l2}</td>
-                              <td className="p-4 font-bold text-amber-600/80">{row.l3}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black text-indigo-600 mb-6 flex items-center gap-3">
-                      <div className="w-1.5 h-4 bg-indigo-600 rounded"></div>
-                      Paediatric CTAS 心率分级 (次/min)
-                    </h4>
-                    <div className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
-                      <table className="w-full text-[10px] text-left">
-                        <thead className="bg-slate-50">
-                          <tr>
-                            <th className="p-4 border-b font-black text-slate-500 uppercase">年龄</th>
-                            <th className="p-4 border-b font-black text-rose-600 uppercase">1级 (危急)</th>
-                            <th className="p-4 border-b font-black text-orange-600 uppercase">2级 (危重)</th>
-                            <th className="p-4 border-b font-black text-amber-600 uppercase">3级 (急症)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {[
-                            { a: '<3月', l1: '>210 / <80', l2: '180-210', l3: '110-180' },
-                            { a: '3-12月', l1: '>190 / <80', l2: '170-190', l3: '110-170' },
-                            { a: '1-3岁', l1: '>180 / <80', l2: '150-180', l3: '100-150' },
-                            { a: '4-11岁', l1: '>160 / <60', l2: '130-160', l3: '70-130' },
-                            { a: '≥12岁', l1: '>140 / <50', l2: '110-140', l3: '60-110' }
-                          ].map(row => (
-                            <tr key={row.a} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="p-4 font-black text-slate-700">{row.a}</td>
-                              <td className="p-4 font-bold text-rose-600/80">{row.l1}</td>
-                              <td className="p-4 font-bold text-orange-600/80">{row.l2}</td>
-                              <td className="p-4 font-bold text-amber-600/80">{row.l3}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
+
+              <div className="flex gap-3">
+                <button onClick={() => setConfirmingSymptom(null)} className="flex-1 py-4 bg-white/60 text-slate-500 rounded-2xl text-sm font-bold border border-white transition-all active:scale-95">取消</button>
+                <button onClick={() => {
+                  executeToggleSymptom(confirmingSymptom.id);
+                  setConfirmingSymptom(null);
+                }} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 transition-all active:scale-95">确认符合</button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Main UI Header */}
-      <div className="w-full relative z-10 flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
-        <div className="text-center md:text-left">
-          <div className="flex items-center justify-center md:justify-start gap-3 mb-1">
-            <div className="w-10 h-10 bg-indigo-600 rounded-[15px] flex items-center justify-center text-white shadow-xl shadow-indigo-100">
-              <i className="fas fa-paw"></i>
-            </div>
-            <h1 className="text-3xl font-[900] text-slate-900 tracking-tighter">PETS<span className="text-indigo-600">.</span></h1>
+      {/* Header */}
+      <div className="w-full flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-indigo-600 rounded-[15px] flex items-center justify-center text-white shadow-xl">
+            <i className="fas fa-paw"></i>
           </div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.5em] ml-1">Intelligent Triage Suite</p>
+          <h1 className="text-3xl font-[900] text-slate-900 tracking-tighter">PETS<span className="text-indigo-600">.</span></h1>
         </div>
-        <div className="flex gap-2.5 bg-white/50 backdrop-blur-md p-1.5 rounded-2xl border border-white/60 shadow-sm ring-1 ring-black/5">
-          <button onClick={() => setShowRefTable('gcs')} className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95">GCS 评分</button>
-          <button onClick={() => setShowRefTable('pts')} className="px-5 py-2.5 bg-rose-600 text-white rounded-xl text-[10px] font-black shadow-lg shadow-rose-100 hover:bg-rose-700 transition-all active:scale-95">PTS 创伤</button>
-          <button onClick={() => setShowRefTable('sh_table')} className="px-5 py-2.5 bg-white text-slate-600 rounded-xl text-[10px] font-black border border-slate-200 hover:bg-slate-50 transition-all active:scale-95">参考标准</button>
+        <div className="flex gap-2 bg-white/80 backdrop-blur p-1.5 rounded-2xl border border-white shadow-sm">
+          <button onClick={() => setShowRefTable('gcs')} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black">GCS评分</button>
+          <button onClick={() => setShowRefTable('pts')} className="px-4 py-2 bg-rose-600 text-white rounded-xl text-[10px] font-black">创伤评分</button>
+          <button onClick={() => setShowRefTable('sh_table')} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black">参考表</button>
         </div>
       </div>
 
-      <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative z-10">
-        {/* Left Column */}
+      <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
+        {/* Patient Form */}
         <div className="lg:col-span-7 space-y-6">
-          <div className="bg-white/70 backdrop-blur-lg rounded-[36px] shadow-sm border border-white/60 p-8 ring-1 ring-black/5">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center"><i className="fas fa-vitals text-xs"></i></div>
-                <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">基础数据与体征</span>
-              </div>
-              <button onClick={reset} className="text-slate-300 hover:text-rose-500 transition-colors"><i className="fas fa-undo-alt text-xs"></i></button>
+          <div className="bg-white/70 backdrop-blur rounded-[36px] shadow-sm border border-white/60 p-8">
+            <div className="flex justify-between items-center mb-6">
+              <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">患者基础录入</span>
+              <button onClick={reset} className="text-slate-300 hover:text-rose-500"><i className="fas fa-undo-alt text-xs"></i></button>
             </div>
-            <div className="grid grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-4 gap-4 mb-6">
               {['ageYears', 'ageMonths', 'ageDays', 'weight'].map((key) => (
                 <div key={key}>
-                  <label className="block text-[9px] font-black text-slate-400 mb-2 ml-1 uppercase">{key.replace('age', '').replace('Years','岁').replace('Months','月').replace('Days','天').replace('weight','体重kg')}</label>
-                  <input type="text" value={(patient as any)[key]} onChange={(e) => key === 'weight' ? handleWeightChange(e.target.value) : handleAgeChange(key as any, e.target.value)} placeholder="-" className="w-full h-14 bg-white/80 border-none rounded-2xl text-center text-sm font-black focus:ring-2 focus:ring-indigo-100 outline-none transition-all shadow-inner" />
+                  <label className="block text-[9px] font-black text-slate-400 mb-2 uppercase">{key.replace('age', '').replace('Years','岁').replace('Months','月').replace('Days','天').replace('weight','体重kg')}</label>
+                  <input type="text" value={(patient as any)[key]} onChange={(e) => key === 'weight' ? handleWeightChange(e.target.value) : handleAgeChange(key as any, e.target.value)} placeholder="-" className="w-full h-12 bg-white border border-slate-100 rounded-2xl text-center text-sm font-black focus:ring-2 focus:ring-indigo-100 outline-none shadow-inner" />
                 </div>
               ))}
             </div>
             <div className="grid grid-cols-3 gap-4">
               {[
                 { id: 'temperature', label: 'T (°C)' }, { id: 'heartRate', label: 'HR (bpm)' }, { id: 'respRate', label: 'RR (bpm)' },
-                { id: 'bloodPressure', label: 'BP (mmHg)' }, { id: 'spo2', label: 'SpO2 (%)' }, { id: 'crt', label: 'CRT (s)' },
+                { id: 'bloodPressure', label: 'SBP (mmHg)' }, { id: 'spo2', label: 'SpO2 (%)' }, { id: 'crt', label: 'CRT (s)' },
               ].map((vital) => (
                 <div key={vital.id}>
-                  <label className="block text-[9px] font-black text-slate-400 mb-2 ml-1 uppercase">{vital.label}</label>
-                  <input type="text" value={patient.vitals[vital.id as keyof VitalSigns]} onChange={(e) => handleVitalChange(vital.id as keyof VitalSigns, e.target.value)} placeholder="-" className="w-full h-14 bg-white/80 border-none rounded-2xl text-center text-sm font-black focus:ring-2 focus:ring-indigo-100 outline-none transition-all shadow-inner" />
+                  <label className="block text-[9px] font-black text-slate-400 mb-2 uppercase">{vital.label}</label>
+                  <input type="text" value={patient.vitals[vital.id as keyof VitalSigns]} onChange={(e) => handleVitalChange(vital.id as keyof VitalSigns, e.target.value)} placeholder="-" className="w-full h-12 bg-white border border-slate-100 rounded-2xl text-center text-sm font-black focus:ring-2 focus:ring-indigo-100 outline-none shadow-inner" />
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="bg-amber-100/30 backdrop-blur-md rounded-[32px] border border-white/60 p-6 ring-1 ring-amber-200/20">
-            <p className="text-[10px] font-black text-amber-600/80 uppercase mb-4 flex items-center gap-2 tracking-widest"><i className="fas fa-exclamation-circle"></i> 风险调节因子 (升级逻辑)</p>
+          <div className="bg-amber-50 rounded-[32px] border border-amber-100 p-6">
+            <p className="text-[10px] font-black text-amber-600 uppercase mb-4 tracking-widest flex items-center gap-2"><i className="fas fa-exclamation-triangle"></i> 风险调节因子</p>
             <div className="grid grid-cols-2 gap-3">
               {HIGH_RISK_FACTORS.map(f => (
-                <button key={f.id} onClick={() => f.helperInfo ? setConfirmingSymptom(f as any) : toggleHighRisk(f.id)} className={`p-4 rounded-2xl border text-[10px] text-left transition-all flex items-center gap-3 ${patient.highRiskFactors.has(f.id) ? 'bg-amber-200/50 border-amber-300 text-amber-900 font-bold' : 'bg-white/50 border-white text-slate-500 hover:border-amber-200 shadow-sm'}`}>
-                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${patient.highRiskFactors.has(f.id) ? 'bg-amber-600 shadow-md shadow-amber-200' : 'bg-slate-200'}`}></div>
+                <button key={f.id} onClick={() => f.helperInfo ? setConfirmingSymptom(f as any) : toggleHighRisk(f.id)} className={`p-4 rounded-2xl border text-[10px] text-left transition-all ${patient.highRiskFactors.has(f.id) ? 'bg-amber-200 border-amber-300 text-amber-900 font-bold' : 'bg-white border-white text-slate-500 shadow-sm'}`}>
                   {f.name}
                 </button>
               ))}
             </div>
           </div>
 
-          {isAnaphylaxisActive && (
-            <div className="bg-rose-50/70 backdrop-blur-xl rounded-[40px] border-2 border-rose-100 p-8 shadow-2xl ring-1 ring-rose-200/50 animate-in slide-in-from-left-4 duration-500">
-              <div className="flex items-center gap-5 mb-8">
-                <div className="w-14 h-14 bg-rose-600 rounded-[22px] flex items-center justify-center text-white shadow-xl shadow-rose-200 animate-pulse">
-                  <i className="fas fa-biohazard text-2xl"></i>
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-rose-950">严重过敏反应 (Anaphylaxis)</h3>
-                  <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mt-1">Emergency Treatment Protocol</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div className="bg-white/80 p-6 rounded-[28px] border border-rose-100 shadow-sm">
-                  <p className="text-[10px] font-black text-rose-600 uppercase mb-4 flex items-center gap-2"><i className="fas fa-syringe"></i> 首选一线：肾上腺素 (IM)</p>
-                  {drugDosages ? (
-                    <div>
-                      <div className="text-4xl font-black text-slate-900 mb-1">{drugDosages.epiFinal} <span className="text-base text-slate-400">mg</span></div>
-                      <p className="text-[10px] font-bold text-slate-400 leading-tight">肌肉注射 (1:1000 溶液)<br/>基于 ${patient.weight}kg 计算 · 最大剂量 0.3mg</p>
-                    </div>
-                  ) : (
-                    <p className="text-xs font-bold text-slate-300 italic">录入体重后自动计算剂量</p>
-                  )}
-                </div>
-                <div className="bg-white/80 p-6 rounded-[28px] border border-rose-100 shadow-sm">
-                  <p className="text-[10px] font-black text-indigo-500 uppercase mb-4 flex items-center gap-2"><i className="fas fa-mortar-pestle"></i> 二线药物方案</p>
-                  {drugDosages ? (
-                    <div className="space-y-4">
-                      <div>
-                        <div className="text-[9px] font-black text-slate-300 uppercase mb-1">激素治疗范围:</div>
-                        <div className="text-sm font-black text-slate-800">甲泼尼龙: {drugDosages.mpMin}~{drugDosages.mpMax} mg</div>
-                      </div>
-                      <div className="h-px bg-slate-100"></div>
-                      <div>
-                        <div className="text-[9px] font-black text-slate-300 uppercase mb-1">抗组胺药:</div>
-                        <div className="text-sm font-black text-slate-800">{drugDosages.antihistamine} (单次剂量)</div>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs font-bold text-slate-300 italic">待定数据...</p>
-                  )}
-                </div>
-              </div>
-              <div className="space-y-3">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 mb-2">专家共识处置要点</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {[
-                    '体位管理：平卧，抬高下肢 (维持回心血量)',
-                    '气道保护：大流量吸氧 (5-10 L/min)',
-                    '循环支持：建立双管静脉通路，备快速扩容',
-                    '严密监护：持续 ECG、NIBP、SpO2 监测',
-                  ].map((step, i) => (
-                    <div key={i} className="flex items-center gap-4 bg-white/50 p-4 rounded-2xl text-[11px] font-bold border border-white shadow-sm backdrop-blur-md">
-                      <div className="w-6 h-6 bg-rose-100 text-rose-600 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0">{i+1}</div>
-                      {step}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="bg-white/70 backdrop-blur-lg rounded-[40px] shadow-sm border border-white/60 overflow-hidden ring-1 ring-black/5">
-            <div className="p-2 grid grid-cols-4 gap-2 bg-black/5">
+          {/* Symptom Selector with 2-Row Tabs */}
+          <div className="bg-white/70 backdrop-blur rounded-[40px] shadow-sm border border-white overflow-hidden">
+            <div className="p-2 grid grid-cols-4 gap-2 bg-slate-50">
               {TRIAGE_CATEGORIES.map(cat => (
-                <button key={cat.id} onClick={() => setActiveTab(cat.id)} className={`py-3.5 px-2 rounded-2xl text-[10px] font-black transition-all flex items-center justify-center text-center leading-tight h-12 ${activeTab === cat.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-white/50'}`}>
+                <button key={cat.id} onClick={() => setActiveTab(cat.id)} className={`py-3 px-2 rounded-xl text-[10px] font-black leading-tight h-12 flex items-center justify-center text-center ${activeTab === cat.id ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:bg-white'}`}>
                   {cat.name}
                 </button>
               ))}
             </div>
-            <div className="p-8 grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto custom-scrollbar">
+            <div className="p-6 grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto custom-scrollbar">
               {TRIAGE_CATEGORIES.find(c => c.id === activeTab)?.symptoms.map(sym => (
-                <button key={sym.id} onClick={() => toggleSymptom(sym)} className={`w-full text-left px-7 py-5 rounded-[24px] border transition-all flex items-center justify-between group ${patient.selectedSymptoms.has(sym.id) ? 'border-indigo-600 bg-indigo-50/50 text-indigo-900 font-black' : 'border-white bg-white/50 text-slate-700 hover:border-indigo-200 shadow-sm'}`}>
+                <button key={sym.id} onClick={() => toggleSymptom(sym)} className={`w-full text-left px-6 py-4 rounded-2xl border transition-all flex items-center justify-between ${patient.selectedSymptoms.has(sym.id) ? 'border-indigo-600 bg-indigo-50 text-indigo-900 font-black' : 'border-slate-50 bg-white text-slate-600 hover:border-indigo-100 shadow-sm'}`}>
                   <span className="text-xs font-bold">{sym.name}</span>
-                  <div className="flex items-center gap-4">
-                    {sym.helperInfo && <i className="fas fa-info-circle text-[11px] text-indigo-300"></i>}
-                    <i className={`fas ${patient.selectedSymptoms.has(sym.id) ? 'fa-check-circle text-indigo-600' : 'fa-plus-circle text-slate-100 group-hover:text-indigo-300'} text-sm`}></i>
-                  </div>
+                  <i className={`fas ${patient.selectedSymptoms.has(sym.id) ? 'fa-check-circle text-indigo-600' : 'fa-plus-circle text-slate-100'} text-sm`}></i>
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Right Column (Results) */}
-        <div className="lg:col-span-5 space-y-6 sticky top-8">
-          <div className={`rounded-[48px] p-10 shadow-2xl text-white relative overflow-hidden transition-all duration-700 ${currentTriage.zoneColor} ring-1 ring-white/20`}>
-            <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none"></div>
+        {/* Results Flow */}
+        <div className="lg:col-span-5 space-y-6">
+          <div className={`rounded-[48px] p-10 shadow-2xl text-white relative overflow-hidden transition-all duration-700 ${currentTriage.zoneColor}`}>
             <div className="relative z-10">
-              <div className="flex justify-between items-start mb-12">
+              <div className="flex justify-between items-start mb-10">
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-3">分诊分级决策建议</div>
-                  <h2 className="text-4xl font-[900] mb-4 tracking-tighter">{currentTriage.levelName}</h2>
-                  <div className="inline-flex items-center gap-3 bg-black/10 px-5 py-2.5 rounded-2xl border border-white/10 backdrop-blur-sm">
-                    <i className="far fa-clock text-xs"></i>
-                    <span className="text-xs font-black">响应时限: {currentTriage.responseTime}</span>
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70 mb-2">分诊分级结果</div>
+                  <h2 className="text-4xl font-[900] mb-3 tracking-tighter">{currentTriage.levelName}</h2>
+                  <div className="inline-flex items-center gap-2 bg-black/10 px-4 py-2 rounded-xl border border-white/10">
+                    <span className="text-[10px] font-black">时限: {currentTriage.responseTime}</span>
                   </div>
                 </div>
-                <button onClick={handleGenerateReport} disabled={isGenerating} className={`flex items-center gap-3 px-6 py-4 bg-white/20 backdrop-blur-xl rounded-[26px] text-[10px] font-black border border-white/20 transition-all shadow-xl ${isGenerating ? 'animate-pulse opacity-50' : 'active:scale-90 hover:bg-white/30'}`}>
-                  {isGenerating ? <i className="fas fa-sync animate-spin"></i> : <i className="fas fa-wand-magic-sparkles"></i>}
-                  AI 临床建议
+                {/* AI Button - Simplified Icon Version */}
+                <button 
+                  onClick={handleGenerateReport} 
+                  disabled={isGenerating} 
+                  className="w-14 h-14 bg-white/20 backdrop-blur-xl rounded-2xl flex items-center justify-center border border-white/20 transition-all active:scale-90 hover:bg-white/30 shadow-xl"
+                  title="获取AI深度临床建议"
+                >
+                   {isGenerating ? <i className="fas fa-sync animate-spin text-lg"></i> : <i className="fas fa-brain text-lg"></i>}
                 </button>
               </div>
 
-              <div className="p-7 bg-white/10 rounded-[32px] border border-white/10 mb-10 text-sm font-bold italic leading-relaxed backdrop-blur-md">
+              <div className="p-6 bg-white/10 rounded-[24px] border border-white/10 mb-8 text-sm font-bold italic">
                 "{currentTriage.description}"
               </div>
 
-              <div className="space-y-4">
-                <div className="text-[10px] font-black uppercase opacity-60 mb-3 tracking-widest px-1">标准临床处置推荐</div>
+              <div className="space-y-3">
                 {currentTriage.interventions.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl text-xs font-bold border border-white/5 backdrop-blur-sm">
-                    <span className="w-7 h-7 bg-white/20 rounded-xl flex items-center justify-center text-[10px] font-black shrink-0">{idx + 1}</span>
+                  <div key={idx} className="flex items-center gap-4 bg-white/5 p-4 rounded-xl text-xs font-bold border border-white/5">
+                    <span className="w-6 h-6 bg-white/20 rounded-lg flex items-center justify-center text-[9px] font-black">{idx + 1}</span>
                     {item}
                   </div>
                 ))}
@@ -648,40 +516,309 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 px-2">
+          <div className="flex flex-wrap gap-2">
             {triageReason.length > 0 ? triageReason.map((r, i) => (
-              <span key={i} className="px-4 py-2 bg-white/80 backdrop-blur-md text-slate-500 rounded-2xl text-[10px] font-black border border-white shadow-sm flex items-center gap-2 ring-1 ring-black/5">
-                <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full shadow-sm"></div>
+              <span key={i} className="px-3 py-1.5 bg-white text-slate-500 rounded-xl text-[10px] font-black border border-slate-100 shadow-sm flex items-center gap-2">
+                <div className="w-1 h-1 bg-indigo-400 rounded-full"></div>
                 {r}
               </span>
-            )) : <span className="text-[11px] text-slate-300 italic font-medium px-2">系统当前无危急体征标记</span>}
+            )) : <span className="text-[10px] text-slate-300 italic font-medium">无危急值预警</span>}
           </div>
 
           {aiReport && (
-            <div className="bg-white/90 backdrop-blur-2xl rounded-[44px] p-10 shadow-2xl border border-white ring-1 ring-black/5 animate-in slide-in-from-bottom-10 duration-500">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 bg-slate-900 rounded-[16px] flex items-center justify-center shadow-xl"><i className="fas fa-robot text-white text-base"></i></div>
-                  <div>
-                    <span className="text-xs font-black uppercase text-slate-800 tracking-tight">AI 临床决策深度分析</span>
-                    <p className="text-[8px] font-bold text-slate-400 tracking-[0.2em]">GEMINI CLINICAL INTELLIGENCE</p>
-                  </div>
+            <div className="bg-white rounded-[40px] p-8 shadow-xl border border-slate-100 animate-in slide-in-from-bottom-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center"><i className="fas fa-magic text-white text-sm"></i></div>
+                  <span className="text-xs font-black uppercase text-slate-800">AI 临床分析建议</span>
                 </div>
-                <button onClick={() => setAiReport(null)} className="w-9 h-9 rounded-full bg-slate-100 text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all"><i className="fas fa-times text-xs"></i></button>
+                <button onClick={() => setAiReport(null)} className="text-slate-200 hover:text-rose-500"><i className="fas fa-times-circle text-lg"></i></button>
               </div>
-              <div className="prose prose-slate max-w-none text-[11px] font-bold text-slate-600 whitespace-pre-wrap leading-[1.8] tracking-tight">
+              <div className="prose prose-slate max-w-none text-[11px] font-bold text-slate-600 whitespace-pre-wrap leading-relaxed">
                 {aiReport}
-              </div>
-              <div className="mt-12 pt-6 border-t border-slate-100 text-[8px] text-slate-300 uppercase font-black text-center tracking-[0.5em] opacity-60">
-                PETS CORE SYSTEM · ADVANCED CLINICAL ANALYTICS
               </div>
             </div>
           )}
         </div>
       </div>
 
-      <div className="mt-24 mb-12 text-[10px] font-black text-slate-200 uppercase tracking-[0.8em] text-center select-none">
-        PETS-LZRYEK · Clinical Decision Support · Build 3.2
+      {/* Overlays for score tools */}
+      {showRefTable && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/10 backdrop-blur animate-in fade-in">
+           <div className="bg-white rounded-[40px] w-full max-w-xl shadow-2xl overflow-hidden p-8 border border-white">
+              <div className="flex justify-between items-center mb-8">
+                 <h3 className="text-xl font-black text-slate-800">
+                    {showRefTable === 'gcs' ? 'GCS 评分计算' : showRefTable === 'pts' ? '创伤评分' : '体征分级参考表'}
+                 </h3>
+                 <button onClick={() => setShowRefTable(null)} className="text-slate-300 hover:text-rose-500"><i className="fas fa-times-circle text-2xl"></i></button>
+              </div>
+              
+              <div className="max-h-[60vh] overflow-y-auto custom-scrollbar text-[11px] font-bold text-slate-600 space-y-4">
+                  {showRefTable === 'sh_table' ? (
+                    <div className="space-y-6">
+                       <div>
+                          <p className="text-indigo-600 font-black mb-2 uppercase">病情分级标准 (专家共识)</p>
+                          <ul className="space-y-1 text-[10px] list-disc list-inside">
+                             <li>1级：濒危 (立即响应)，生命体征极不稳定</li>
+                             <li>2级：危重 (≤15min)，生命体征不稳定</li>
+                             <li>3级：急症 (≤1h)，生命体征稳定，潜在风险</li>
+                             <li>4级：亚急症 (≤2h)，病情稳定</li>
+                             <li>5级：非急症 (≤4h)，症状轻微</li>
+                          </ul>
+                       </div>
+                       <div className="h-px bg-slate-100"></div>
+                       <div>
+                          <p className="text-indigo-600 font-black mb-2 uppercase">生理指标异常分级 (表3)</p>
+                          <div className="overflow-x-auto">
+                             <table className="w-full text-[9px] border-collapse border border-slate-200">
+                                <thead>
+                                   <tr className="bg-slate-50">
+                                      <th className="border border-slate-200 p-1">年龄</th>
+                                      <th className="border border-slate-200 p-1">1级</th>
+                                      <th className="border border-slate-200 p-1">2级</th>
+                                      <th className="border border-slate-200 p-1">3级</th>
+                                      <th className="border border-slate-200 p-1">4级</th>
+                                      <th className="border border-slate-200 p-1">5级</th>
+                                   </tr>
+                                </thead>
+                                <tbody>
+                                   <tr>
+                                      <td className="border border-slate-200 p-1">&lt;3月</td>
+                                      <td className="border border-slate-200 p-1">RR&gt;70 or &lt;10<br/>HR&gt;210 or &lt;80</td>
+                                      <td className="border border-slate-200 p-1">RR 60-70 or 10-15<br/>HR 180-210 or 80-90</td>
+                                      <td className="border border-slate-200 p-1">RR 50-59 or 15-20<br/>HR 110-179 or 90-100</td>
+                                      <td className="border border-slate-200 p-1">RR 40-49<br/>HR 100-109</td>
+                                      <td className="border border-slate-200 p-1">RR 25-40<br/>HR 100-180</td>
+                                   </tr>
+                                   <tr>
+                                      <td className="border border-slate-200 p-1">3-12月</td>
+                                      <td className="border border-slate-200 p-1">RR&gt;60 or &lt;10<br/>HR&gt;190 or &lt;80</td>
+                                      <td className="border border-slate-200 p-1">RR 50-60 or 10-15<br/>HR 170-190 or 80-90</td>
+                                      <td className="border border-slate-200 p-1">RR 40-49 or 15-20<br/>HR 110-169 or 90-100</td>
+                                      <td className="border border-slate-200 p-1">RR 30-39<br/>HR 100-109</td>
+                                      <td className="border border-slate-200 p-1">RR 20-30<br/>HR 100-160</td>
+                                   </tr>
+                                   <tr>
+                                      <td className="border border-slate-200 p-1">1-3岁</td>
+                                      <td className="border border-slate-200 p-1">RR&gt;50 or &lt;10<br/>HR&gt;180 or &lt;80</td>
+                                      <td className="border border-slate-200 p-1">RR 40-50 or 10-15<br/>HR 150-180 or 80-90</td>
+                                      <td className="border border-slate-200 p-1">RR 30-39 or 15-20<br/>HR 100-149 or 90-100</td>
+                                      <td className="border border-slate-200 p-1">RR 25-29<br/>HR 90-99</td>
+                                      <td className="border border-slate-200 p-1">RR 20-25<br/>HR 90-150</td>
+                                   </tr>
+                                   <tr>
+                                      <td className="border border-slate-200 p-1">4-11岁</td>
+                                      <td className="border border-slate-200 p-1">RR&gt;40 or &lt;8<br/>HR&gt;160 or &lt;60</td>
+                                      <td className="border border-slate-200 p-1">RR 30-40 or 8-12<br/>HR 130-160 or 60-65</td>
+                                      <td className="border border-slate-200 p-1">RR 20-29 or 12-15<br/>HR 70-129 or 65-70</td>
+                                      <td className="border border-slate-200 p-1">RR 18-19<br/>HR 65-69</td>
+                                      <td className="border border-slate-200 p-1">RR 14-18<br/>HR 70-120</td>
+                                   </tr>
+                                   <tr>
+                                      <td className="border border-slate-200 p-1">≥12岁</td>
+                                      <td className="border border-slate-200 p-1">RR&gt;30 or &lt;8<br/>HR&gt;140 or &lt;50</td>
+                                      <td className="border border-slate-200 p-1">RR 20-30 or 8-12<br/>HR 110-140 or 50-55</td>
+                                      <td className="border border-slate-200 p-1">RR 15-19 or 12-14<br/>HR 60-109 or 55-60</td>
+                                      <td className="border border-slate-200 p-1">RR 13-14<br/>HR 55-59</td>
+                                      <td className="border border-slate-200 p-1">RR 12-14<br/>HR 60-100</td>
+                                   </tr>
+                                </tbody>
+                             </table>
+                          </div>
+                       </div>
+                    </div>
+                 ) : showRefTable === 'gcs' ? (
+                    <div className="space-y-4">
+                       <div className="flex justify-between items-end">
+                           <div>
+                              <p className="text-xs font-black text-indigo-600">儿童改良版 GCS 评分</p>
+                              <p className="text-[10px] opacity-50 italic">请根据患儿反应选择...</p>
+                           </div>
+                           <div className="text-right">
+                              <div className={`text-xs font-black ${gcsClinicalSignificance.color}`}>{gcsClinicalSignificance.label}</div>
+                              <div className="text-2xl font-black text-slate-900">{gcsTotal}{gcsV === 'T' ? 'T' : ''} <span className="text-xs font-normal opacity-30">/ 15</span></div>
+                           </div>
+                        </div>
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Minimal GCS Inputs */}
+                          <div className="space-y-2">
+                             <p className="text-[10px] uppercase font-black text-slate-400">睁眼反应 (E)</p>
+                             {GCS_CONFIG.eye.map(item => (
+                                <button 
+                                  key={item.score} 
+                                  onClick={() => setGcsE(item.score)} 
+                                  className={`w-full p-2 rounded-xl text-[10px] border flex justify-between items-center text-left transition-all ${gcsE === item.score ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}
+                                >
+                                  <span className="flex-1 leading-tight">{item.label}</span>
+                                  <span className={`ml-2 font-black px-1.5 py-0.5 rounded ${gcsE === item.score ? 'bg-white/20' : 'bg-slate-100'}`}>{item.score}</span>
+                                </button>
+                              ))}
+                          </div>
+                           <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                 <p className="text-[10px] uppercase font-black text-slate-400">语言反应 (V)</p>
+                                 <button 
+                                    onClick={() => setGcsV(prev => prev === 'T' ? 5 : 'T')}
+                                    className={`text-[9px] px-1.5 py-0.5 rounded border font-bold transition-colors ${gcsV === 'T' ? 'bg-rose-600 text-white border-rose-600' : 'bg-slate-100 text-slate-400 border-slate-200'}`}
+                                 >
+                                    气管插管 (T)
+                                 </button>
+                              </div>
+                              {gcsV === 'T' ? (
+                                 <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-center">
+                                    <p className="text-[10px] text-rose-600 font-bold">已标记为气管插管 (T)</p>
+                                    <p className="text-[9px] text-rose-400 mt-1">语言评分记为 1 分</p>
+                                 </div>
+                              ) : (
+                                 GCS_CONFIG.verbal.map(item => (
+                                    <button 
+                                      key={item.score} 
+                                      onClick={() => setGcsV(item.score)} 
+                                      className={`w-full p-2 rounded-xl text-[10px] border flex justify-between items-center text-left transition-all ${gcsV === item.score ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}
+                                    >
+                                      <span className="flex-1 leading-tight">{item.label}</span>
+                                      <span className={`ml-2 font-black px-1.5 py-0.5 rounded ${gcsV === item.score ? 'bg-white/20' : 'bg-slate-100'}`}>{item.score}</span>
+                                    </button>
+                                 ))
+                              )}
+                           </div>
+                           <div className="space-y-2">
+                              <p className="text-[10px] uppercase font-black text-slate-400">运动反应 (M)</p>
+                              {GCS_CONFIG.motor.map(item => (
+                                <button 
+                                  key={item.score} 
+                                  onClick={() => setGcsM(item.score)} 
+                                  className={`w-full p-2 rounded-xl text-[10px] border flex justify-between items-center text-left transition-all ${gcsM === item.score ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}
+                                >
+                                  <span className="flex-1 leading-tight">{item.label}</span>
+                                  <span className={`ml-2 font-black px-1.5 py-0.5 rounded ${gcsM === item.score ? 'bg-white/20' : 'bg-slate-100'}`}>{item.score}</span>
+                                </button>
+                              ))}
+                           </div>
+                        </div>
+
+                        <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                           <p className="text-[9px] text-slate-400 leading-relaxed">
+                              <span className="font-bold text-slate-500">临床意义：</span>
+                              满分15分(清醒)；轻度13-14分；中度9-12分；重度≤8分(严重脑损伤，通常需插管通气)。
+                           </p>
+                        </div>
+                       <button onClick={applyGcsToTriage} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 transition-transform active:scale-[0.98]">
+                           同步总分: {gcsTotal}{gcsV === 'T' ? 'T' : ''}
+                        </button>
+                    </div>
+                 ) : (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-end">
+                           <div>
+                              <p className="text-xs font-black text-rose-600">儿童创伤评分 (PTS)</p>
+                              <p className="text-[10px] opacity-50 italic">请根据患儿情况选择...</p>
+                           </div>
+                           <div className="text-right">
+                              <div className={`text-xs font-black ${ptsClinicalSignificance.color}`}>{ptsClinicalSignificance.label}</div>
+                              <div className="text-2xl font-black text-slate-900">{ptsTotal} <span className="text-xs font-normal opacity-30">/ 12</span></div>
+                           </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <div className="space-y-2">
+                              <p className="text-[10px] uppercase font-black text-slate-400">体重 (Size)</p>
+                              {PTS_CONFIG.size.map(item => (
+                                <button 
+                                  key={item.score} 
+                                  onClick={() => setPtsSize(item.score)} 
+                                  className={`w-full p-2 rounded-xl text-[10px] border flex justify-between items-center text-left transition-all ${ptsSize === item.score ? 'bg-rose-600 text-white border-rose-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-rose-300'}`}
+                                >
+                                  <span className="flex-1 leading-tight">{item.label}</span>
+                                  <span className={`ml-2 font-black px-1.5 py-0.5 rounded ${ptsSize === item.score ? 'bg-white/20' : 'bg-slate-100'}`}>{item.score > 0 ? `+${item.score}` : item.score}</span>
+                                </button>
+                              ))}
+                           </div>
+                           <div className="space-y-2">
+                              <p className="text-[10px] uppercase font-black text-slate-400">气道 (Airway)</p>
+                              {PTS_CONFIG.airway.map(item => (
+                                <button 
+                                  key={item.score} 
+                                  onClick={() => setPtsAirway(item.score)} 
+                                  className={`w-full p-2 rounded-xl text-[10px] border flex justify-between items-center text-left transition-all ${ptsAirway === item.score ? 'bg-rose-600 text-white border-rose-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-rose-300'}`}
+                                >
+                                  <span className="flex-1 leading-tight">{item.label}</span>
+                                  <span className={`ml-2 font-black px-1.5 py-0.5 rounded ${ptsAirway === item.score ? 'bg-white/20' : 'bg-slate-100'}`}>{item.score > 0 ? `+${item.score}` : item.score}</span>
+                                </button>
+                              ))}
+                           </div>
+                           <div className="space-y-2">
+                              <p className="text-[10px] uppercase font-black text-slate-400">收缩压 (SBP)</p>
+                              {PTS_CONFIG.sbp.map(item => (
+                                <button 
+                                  key={item.score} 
+                                  onClick={() => setPtsSbp(item.score)} 
+                                  className={`w-full p-2 rounded-xl text-[10px] border flex justify-between items-center text-left transition-all ${ptsSbp === item.score ? 'bg-rose-600 text-white border-rose-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-rose-300'}`}
+                                >
+                                  <span className="flex-1 leading-tight">{item.label}</span>
+                                  <span className={`ml-2 font-black px-1.5 py-0.5 rounded ${ptsSbp === item.score ? 'bg-white/20' : 'bg-slate-100'}`}>{item.score > 0 ? `+${item.score}` : item.score}</span>
+                                </button>
+                              ))}
+                           </div>
+                           <div className="space-y-2">
+                              <p className="text-[10px] uppercase font-black text-slate-400">中枢神经 (CNS)</p>
+                              {PTS_CONFIG.cns.map(item => (
+                                <button 
+                                  key={item.score} 
+                                  onClick={() => setPtsCns(item.score)} 
+                                  className={`w-full p-2 rounded-xl text-[10px] border flex justify-between items-center text-left transition-all ${ptsCns === item.score ? 'bg-rose-600 text-white border-rose-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-rose-300'}`}
+                                >
+                                  <span className="flex-1 leading-tight">{item.label}</span>
+                                  <span className={`ml-2 font-black px-1.5 py-0.5 rounded ${ptsCns === item.score ? 'bg-white/20' : 'bg-slate-100'}`}>{item.score > 0 ? `+${item.score}` : item.score}</span>
+                                </button>
+                              ))}
+                           </div>
+                           <div className="space-y-2">
+                              <p className="text-[10px] uppercase font-black text-slate-400">骨骼 (Skeletal)</p>
+                              {PTS_CONFIG.skeletal.map(item => (
+                                <button 
+                                  key={item.score} 
+                                  onClick={() => setPtsSkeletal(item.score)} 
+                                  className={`w-full p-2 rounded-xl text-[10px] border flex justify-between items-center text-left transition-all ${ptsSkeletal === item.score ? 'bg-rose-600 text-white border-rose-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-rose-300'}`}
+                                >
+                                  <span className="flex-1 leading-tight">{item.label}</span>
+                                  <span className={`ml-2 font-black px-1.5 py-0.5 rounded ${ptsSkeletal === item.score ? 'bg-white/20' : 'bg-slate-100'}`}>{item.score > 0 ? `+${item.score}` : item.score}</span>
+                                </button>
+                              ))}
+                           </div>
+                           <div className="space-y-2">
+                              <p className="text-[10px] uppercase font-black text-slate-400">皮肤 (Cutaneous)</p>
+                              {PTS_CONFIG.cutaneous.map(item => (
+                                <button 
+                                  key={item.score} 
+                                  onClick={() => setPtsCutaneous(item.score)} 
+                                  className={`w-full p-2 rounded-xl text-[10px] border flex justify-between items-center text-left transition-all ${ptsCutaneous === item.score ? 'bg-rose-600 text-white border-rose-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-rose-300'}`}
+                                >
+                                  <span className="flex-1 leading-tight">{item.label}</span>
+                                  <span className={`ml-2 font-black px-1.5 py-0.5 rounded ${ptsCutaneous === item.score ? 'bg-white/20' : 'bg-slate-100'}`}>{item.score > 0 ? `+${item.score}` : item.score}</span>
+                                </button>
+                              ))}
+                           </div>
+                        </div>
+
+                        <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                           <p className="text-[9px] text-slate-400 leading-relaxed">
+                              <span className="font-bold text-slate-500">临床意义：</span>
+                              {ptsClinicalSignificance.desc}。
+                           </p>
+                        </div>
+                        <button onClick={applyPtsToTriage} className="w-full py-4 bg-rose-600 text-white rounded-2xl font-black shadow-lg shadow-rose-100 transition-transform active:scale-[0.98]">
+                           同步总分: {ptsTotal}
+                        </button>
+                    </div>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
+      
+      <div className="mt-12 text-[9px] font-black text-slate-200 uppercase tracking-[1em]">
+        PETS-LZRYEK · Clinical Decision Support System
       </div>
     </div>
   );

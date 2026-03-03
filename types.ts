@@ -13,6 +13,8 @@ export interface Symptom {
   level: TriageLevel;
   description?: string;
   helperInfo?: string; // 表3/表4/表5等详细判定标准内容
+  confirmMessage?: string; // 确认弹窗提示内容
+  actionType?: 'epinephrine_calc'; // 特殊操作类型
 }
 
 export interface TriageCategory {
