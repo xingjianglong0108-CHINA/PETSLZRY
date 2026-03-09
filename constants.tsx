@@ -6,11 +6,12 @@ export const HIGH_RISK_FACTORS = [
   { id: 'complex_history', name: '合并高危基础病史 (如先心、免疫缺陷、肿瘤等) (注3)', upgrade: true },
   { 
     id: 'p_severe', 
-    name: 'P: 剧烈/严重疼痛 (7-10分) (注4)', 
-    upgrade: true, 
+    name: 'P: 剧烈/严重疼痛 7-10分 (2级)', 
+    upgrade: false, 
     helperInfo: 'Wong-Baker 面部表情疼痛量表或数字评定量表 (NRS) 评分 7～10 分。' 
   },
-  { id: 'p_moderate', name: 'P: 中度疼痛 (4-6分)', upgrade: false },
+  { id: 'p_moderate', name: 'P: 中度疼痛 4-6分 (3级)', upgrade: false },
+  { id: 'p_mild', name: 'P: 轻度疼痛 1-3分 (4级)', upgrade: false },
   { id: 'guardian_anxiety', name: '家长极度焦虑 / 医疗纠纷高风险 (注5)', upgrade: false }
 ];
 
@@ -19,29 +20,30 @@ export const TRIAGE_CATEGORIES: TriageCategory[] = [
     id: 'temp_age',
     name: '体温与年龄',
     symptoms: [
-      { id: 't1', name: '高热伴热惊厥 (1级)', level: TriageLevel.L1 },
-      { id: 't2', name: '体温≥41℃ 或 体温≤35℃ (1级)', level: TriageLevel.L1 },
-      { id: 't3', name: '≤24h新生儿 (1级)', level: TriageLevel.L1 },
-      { id: 't4', name: '体温≥39℃ (2级)', level: TriageLevel.L2 },
-      { id: 't5', name: '≤3月婴儿 (2级)', level: TriageLevel.L2 },
-      { id: 't6', name: '体温≥38.5℃ (3级)', level: TriageLevel.L3 },
-      { id: 't7', name: '＞3月婴儿 (3级)', level: TriageLevel.L3 },
-      { id: 't8', name: '体温≥38℃ (4级)', level: TriageLevel.L4 }
+      { id: 't1', name: '高热伴惊厥 (1级)', level: TriageLevel.L1 },
+      { id: 't2', name: '体温≥41℃；体温≤35℃ (2级)', level: TriageLevel.L2, confirmMessage: '本共识体温以耳温测定分级。耳温≤35℃为 2 级，肛温确认；新生儿体温采用腋温、肛温确认，腋温≤36℃（肛温 < 36.5℃）酌情列入 2 级。' },
+      { id: 't3', name: '≤24h新生儿 (2级)', level: TriageLevel.L2 },
+      { id: 't4', name: '体温≥39℃ (3级)', level: TriageLevel.L3, confirmMessage: '本共识体温以耳温测定分级。耳温 39~41℃为 3 级，其中 < 3 个月婴儿、粒细胞缺乏、免疫缺陷患儿酌情列入 2 级。' },
+      { id: 't5', name: '≤3月婴儿 (3级)', level: TriageLevel.L3 },
+      { id: 't6', name: '体温≥38.5℃ (4级)', level: TriageLevel.L4 },
+      { id: 't7', name: '＞3月婴儿 (4级)', level: TriageLevel.L4 },
+      { id: 't8', name: '体温≥38℃ (5级)', level: TriageLevel.L5 }
     ]
   },
   {
     id: 'neuro',
     name: '神经系统',
     symptoms: [
-      { id: 'n1', name: '深昏迷 (GCS ≤9分) (1级)', level: TriageLevel.L1, helperInfo: '儿童改良版格拉斯哥昏迷评分 (GCS) 3～9 分。表现为无反应，气道不能维持。', confirmMessage: 'GCS 评分≤9 分为 1 级' },
-      { id: 'n2', name: '浅昏迷、嗜睡、烦躁不安(谵妄) (GCS 10-13分) (2级)', level: TriageLevel.L2, helperInfo: '儿童改良版格拉斯哥昏迷评分 (GCS) 10～13 分。', confirmMessage: 'GCS 评分 10~13 分为 2 级' },
-      { id: 'n3', name: '惊厥发作后24h (2级)', level: TriageLevel.L2 },
-      { id: 'n4', name: '剧烈头痛 (2级)', level: TriageLevel.L2, helperInfo: '剧烈/严重疼痛 7-10分', confirmMessage: '急性疼痛程度：剧烈 / 严重疼痛 7~10 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
+      { id: 'n1', name: '深昏迷G (1级)', level: TriageLevel.L1, confirmMessage: 'G的含义：急诊抢救室评估 1级至2 级患儿儿童改良版格拉斯哥昏迷评分法，GCS 评分≤9 分为 1 级，GCS 评分 10分至13 分为 2 级；3级至5 级无需评分（GCS14分至15 分）' },
+      { id: 'n2', name: '惊厥发作 (1级)', level: TriageLevel.L1 },
+      { id: 'n3', name: '浅昏迷、嗜睡、烦躁不安（谵妄）G (2级)', level: TriageLevel.L2, confirmMessage: 'G的含义：急诊抢救室评估 1级至2 级患儿儿童改良版格拉斯哥昏迷评分法，GCS 评分≤9 分为 1 级，GCS 评分 10分至13 分为 2 级；3级至5 级无需评分（GCS14分至15 分）' },
+      { id: 'n4', name: '剧烈头痛P (2级)', level: TriageLevel.L2, confirmMessage: 'P的含义：急性疼痛程度：剧烈 / 严重疼痛 7分至10 分，中度疼痛 4分至6 分，轻度疼痛 1分至3 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
       { id: 'n5', name: '急性瘫痪/松软儿 (2级)', level: TriageLevel.L2 },
       { id: 'n6', name: '精神状态改变；短暂意识不清楚 (3级)', level: TriageLevel.L3 },
-      { id: 'n7', name: '明显头痛 (3级)', level: TriageLevel.L3, helperInfo: '中度疼痛 4-6分', confirmMessage: '急性疼痛程度：中度疼痛 4~6 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
-      { id: 'n8', name: '神志清楚、对答切题 (4级)', level: TriageLevel.L4 },
-      { id: 'n9', name: '神志清楚对答切题 (5级)', level: TriageLevel.L5 }
+      { id: 'n7', name: '惊厥发作后24h (3级)', level: TriageLevel.L3 },
+      { id: 'n8', name: '明显头痛P (3级)', level: TriageLevel.L3, confirmMessage: 'P的含义：急性疼痛程度：剧烈 / 严重疼痛 7分至10 分，中度疼痛 4分至6 分，轻度疼痛 1分至3 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
+      { id: 'n9', name: '神志清楚、对答切题 (4级)', level: TriageLevel.L4 },
+      { id: 'n10', name: '神志清楚对答切题 (5级)', level: TriageLevel.L5 }
     ]
   },
   {
@@ -74,16 +76,16 @@ export const TRIAGE_CATEGORIES: TriageCategory[] = [
     symptoms: [
       { id: 'c1', name: '心搏骤停 (1级)', level: TriageLevel.L1 },
       { id: 'c2', name: '严重心律失常 (1级)', level: TriageLevel.L1 },
-      { id: 'c3', name: '休克（失代偿） (1级)', level: TriageLevel.L1, confirmMessage: '失代偿性休克为 1 级，严重终末器官灌注不足表现：面色苍白、四肢湿冷、脉搏微弱、明显心动过速或心动过缓、低血压、通气不足或低氧、体位性晕厥、意识水平下降；也可表现为面色潮红、皮肤发干、肢端暖、脉压差大、烦躁，常见于感染性休克。低血压标准：新生儿收缩压 < 60mmHg，1~12 个月收缩压 < 70mmHg，1~10 岁收缩压 < (70 + 年龄 ×2) mmHg，>10 岁收缩压 < 90mmHg。' },
+      { id: 'c3', name: '休克（失代偿）C (1级)', level: TriageLevel.L1, confirmMessage: 'C的含义：失代偿性休克为 1 级，严重终末器官灌注不足表现：面色苍白、四肢湿冷、脉搏微弱、明显心动过速或心动过缓 (表 4:1 级)、低血压、通气不足或低氧、体位性晕厥、意识水平下降；也可表现为面色潮红、皮肤发干、肢端暖、脉压差大、烦躁，常见于感染性休克。低血压标准：新生儿收缩压 < 60mmHg，1月至12 个月收缩压 < 70mmHg，1岁至10 岁收缩压 < (70 + 年龄 ×2) mmHg，>10 岁收缩压 < 90mmHg。' },
       { id: 'c4', name: '心力衰竭 (2级)', level: TriageLevel.L2 },
       { id: 'c5', name: '心律失常伴循环稳定 (2级)', level: TriageLevel.L2 },
-      { id: 'c6', name: '休克（代偿） (2级)', level: TriageLevel.L2, confirmMessage: '代偿性休克为 2 级：存在组织灌注不良表现如毛细血管充盈时间延长、心动过速、少尿和面色改变；因机体代偿，可表现为血压正常。' },
-      { id: 'c7', name: '严重胸痛、胸闷 (2级)', level: TriageLevel.L2, confirmMessage: '急性疼痛程度：剧烈 / 严重疼痛 7~10 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
+      { id: 'c6', name: '休克（代偿）C (2级)', level: TriageLevel.L2, confirmMessage: 'C的含义：代偿性休克为 2 级：存在组织灌注不良表现如毛细血管充盈时间延长、心动过速 (表 4:2 级)、少尿和面色改变；因机体代偿，可表现为血压正常。' },
+      { id: 'c7', name: '严重胸痛、胸闷P (2级)', level: TriageLevel.L2, confirmMessage: 'P的含义：急性疼痛程度：剧烈 / 严重疼痛 7分至10 分，中度疼痛 4分至6 分，轻度疼痛 1分至3 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
       { id: 'c8', name: '高血压伴惊厥、昏迷 (2级)', level: TriageLevel.L2 },
-      { id: 'c9', name: '急性心动过速/过缓伴血压正常 (3级)', level: TriageLevel.L3, confirmMessage: '心动过速 / 过缓伴血压正常为 3 级：心率与正常值相差 +/-2 标准差。' },
-      { id: 'c10', name: '明显胸痛 (3级)', level: TriageLevel.L3, confirmMessage: '急性疼痛程度：中度疼痛 4~6 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
+      { id: 'c9', name: '急性心动过速/过缓伴血压正常C (3级)', level: TriageLevel.L3, confirmMessage: 'C的含义：心动过速 / 过缓伴血压正常为 3 级：心率与正常值相差 +/-2 标准差（表 4:3 级）。' },
+      { id: 'c10', name: '明显胸痛P (3级)', level: TriageLevel.L3, confirmMessage: 'P的含义：急性疼痛程度：剧烈 / 严重疼痛 7分至10 分，中度疼痛 4分至6 分，轻度疼痛 1分至3 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
       { id: 'c11', name: '循环稳定 (4级)', level: TriageLevel.L4 },
-      { id: 'c12', name: '胸痛 (4级)', level: TriageLevel.L4, confirmMessage: '急性疼痛程度：轻度疼痛 1~3 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
+      { id: 'c12', name: '胸痛P (4级)', level: TriageLevel.L4, confirmMessage: 'P的含义：急性疼痛程度：剧烈 / 严重疼痛 7分至10 分，中度疼痛 4分至6 分，轻度疼痛 1分至3 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
       { id: 'c13', name: '循环稳定 (5级)', level: TriageLevel.L5 }
     ]
   },
@@ -91,15 +93,15 @@ export const TRIAGE_CATEGORIES: TriageCategory[] = [
     id: 'gi',
     name: '消化/泌尿系统',
     symptoms: [
-      { id: 'gi1', name: '消化道大出血 (1级)', level: TriageLevel.L1 },
-      { id: 'gi2', name: '腹泻、呕吐伴重度脱水/重度脱水，并有生命体征异常 (2级)', level: TriageLevel.L2 },
-      { id: 'gi3', name: '活动性消化道出血 (2级)', level: TriageLevel.L2 },
-      { id: 'gi4', name: '明显腹胀/呕吐/急性腹痛伴生命征异常 (2级)', level: TriageLevel.L2 },
+      { id: 'gi1', name: '消化道大出血C (1级)', level: TriageLevel.L1, confirmMessage: 'C的含义：失代偿性休克为 1 级，严重终末器官灌注不足表现：面色苍白、四肢湿冷、脉搏微弱、明显心动过速或心动过缓 (表 4:1 级)、低血压、通气不足或低氧、体位性晕厥、意识水平下降；也可表现为面色潮红、皮肤发干、肢端暖、脉压差大、烦躁，常见于感染性休克。低血压标准：新生儿收缩压 < 60mmHg，1月至12 个月收缩压 < 70mmHg，1岁至10 岁收缩压 < (70 + 年龄 ×2) mmHg，>10 岁收缩压 < 90mmHg。' },
+      { id: 'gi2', name: '腹泻、呕吐伴重度脱水/重度脱水，并有生命体重异常 (2级)', level: TriageLevel.L2 },
+      { id: 'gi3', name: '活动性消化道出血C (2级)', level: TriageLevel.L2, confirmMessage: 'C的含义：代偿性休克为 2 级：存在组织灌注不良表现如毛细血管充盈时间延长、心动过速 (表 4:2 级)、少尿和面色改变；因机体代偿，可表现为血压正常。' },
+      { id: 'gi4', name: '明显腹胀/呕吐/急性腹痛伴生命征异常P (2级)', level: TriageLevel.L2, confirmMessage: 'P含义: 急性疼痛程度：剧烈 / 严重疼痛 7分至10 分，中度疼痛 4分至6 分，轻度疼痛 1分至3 分。' },
       { id: 'gi5', name: '消化道异物（性质部位不明/食道/有症状） (2级)', level: TriageLevel.L2 },
       { id: 'gi6', name: '急性肾功能衰竭 (2级)', level: TriageLevel.L2 },
       { id: 'gi7', name: '腹泻、呕吐伴中度脱水 (3级)', level: TriageLevel.L3 },
-      { id: 'gi8', name: '急性消化道出血 (3级)', level: TriageLevel.L3 },
-      { id: 'gi9', name: '持续或胆汁性呕吐/急性腹痛 (3级)', level: TriageLevel.L3 },
+      { id: 'gi8', name: '急性消化道出血C (3级)', level: TriageLevel.L3, confirmMessage: 'C的含义：心动过速 / 过缓伴血压正常为 3 级：心率与正常值相差 +/-2 标准差（表 4:3 级）。' },
+      { id: 'gi9', name: '持续或胆汁性呕吐/急性腹痛P (3级)', level: TriageLevel.L3, confirmMessage: 'P含义: 急性疼痛程度：剧烈 / 严重疼痛 7分至10 分，中度疼痛 4分至6 分，轻度疼痛 1分至3 分。' },
       { id: 'gi10', name: '少尿 (3级)', level: TriageLevel.L3 },
       { id: 'gi11', name: '腹泻、呕吐伴轻度脱水 (4级)', level: TriageLevel.L4 },
       { id: 'gi12', name: '腹泻、呕吐不伴脱水 (5级)', level: TriageLevel.L5 }
@@ -117,13 +119,12 @@ export const TRIAGE_CATEGORIES: TriageCategory[] = [
       { id: 's6', name: '眼外伤眼球损伤 (2级)', level: TriageLevel.L2 },
       { id: 's7', name: '血管神经受累的开放性骨折 (2级)', level: TriageLevel.L2 },
       { id: 's8', name: 'Ⅱ°烧烫伤（＞10%体表面积或面、手足受累） (2级)', level: TriageLevel.L2 },
-      { id: 's9', name: '严重睾丸疼痛 (2级)', level: TriageLevel.L2, confirmMessage: '急性疼痛程度：剧烈 / 严重疼痛 7~10 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
+      { id: 's9', name: '严重睾丸疼痛P (2级)', level: TriageLevel.L2, confirmMessage: 'P的含义: 急性疼痛程度：剧烈 / 严重疼痛 7分至10 分，中度疼痛 4分至6 分，轻度疼痛 1分至3 分。' },
       { id: 's10', name: '单侧撕裂伤 (3级)', level: TriageLevel.L3 },
       { id: 's11', name: '血管神经未受累的骨折 (3级)', level: TriageLevel.L3 },
       { id: 's12', name: 'Ⅱ°烧烫伤（＜10%体表面积） (3级)', level: TriageLevel.L3 },
-      { id: 's13', name: '睾丸疼痛或肿胀/阴囊外伤 (3级)', level: TriageLevel.L3, confirmMessage: '急性疼痛程度：中度疼痛 4~6 分（Wong-Baker 面部表情疼痛量表 / 数字评定量表）' },
-      { id: 's14', name: '腹股沟肿块 (3级)', level: TriageLevel.L3 },
-      { id: 's15', name: 'Ⅰ°烧烫伤 (4级)', level: TriageLevel.L4 }
+      { id: 's13', name: '睾丸疼痛P或肿胀/阴囊外伤 (3级)', level: TriageLevel.L3, confirmMessage: 'P的含义: 急性疼痛程度：剧烈 / 严重疼痛 7分至10 分，中度疼痛 4分至6 分，轻度疼痛 1分至3 分。' },
+      { id: 's14', name: 'Ⅰ°烧烫伤 (4级)', level: TriageLevel.L4 }
     ]
   },
   {
@@ -187,6 +188,15 @@ export const GCS_CONFIG = {
     { score: 1, label: '无反应 (None)' },
   ]
 };
+
+export const WONG_BAKER_CONFIG = [
+  { score: 0, label: '无痛', desc: '无痛状态', emoji: '😃', color: 'bg-lime-500' },
+  { score: 2, label: '微痛', desc: '轻微疼痛', emoji: '🙂', color: 'bg-yellow-400' },
+  { score: 4, label: '有些痛', desc: '中度疼痛', emoji: '😐', color: 'bg-amber-400' },
+  { score: 6, label: '很痛', desc: '中度疼痛', emoji: '☹️', color: 'bg-orange-500' },
+  { score: 8, label: '疼痛剧烈', desc: '重度疼痛', emoji: '😫', color: 'bg-red-500' },
+  { score: 10, label: '疼痛难忍', desc: '极度疼痛', emoji: '😭', color: 'bg-rose-700' }
+];
 
 export const PTS_CONFIG = {
   size: [

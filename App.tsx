@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { TRIAGE_CATEGORIES, TRIAGE_RESULT_CONFIG, HIGH_RISK_FACTORS, GCS_CONFIG, PTS_CONFIG } from './constants';
+import { TRIAGE_CATEGORIES, TRIAGE_RESULT_CONFIG, HIGH_RISK_FACTORS, GCS_CONFIG, PTS_CONFIG, WONG_BAKER_CONFIG } from './constants';
 import { TriageLevel, PatientState, TriageResult, VitalSigns, Symptom } from './types';
 import { getAIClinicalReport } from './services/geminiService';
 
@@ -14,7 +14,8 @@ const App: React.FC = () => {
   const [aiReport, setAiReport] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [confirmingSymptom, setConfirmingSymptom] = useState<Symptom | null>(null);
-  const [showRefTable, setShowRefTable] = useState<'gcs' | 'sh_table' | 'pts' | null>(null);
+  const [showRefTable, setShowRefTable] = useState<'gcs' | 'sh_table' | 'pts' | 'wong_baker' | null>(null);
+  const [wongBakerScore, setWongBakerScore] = useState<number>(0);
 
   // GCS Calculator State
   const [gcsE, setGcsE] = useState<number>(4);
@@ -112,6 +113,20 @@ const App: React.FC = () => {
       if (ptsTotal <= 8) next.add('s1');
       else next.delete('s1');
       return { ...prev, selectedSymptoms: next };
+    });
+    setShowRefTable(null);
+  };
+
+  const applyWongBakerToTriage = () => {
+    setPatient(prev => {
+      const next = new Set(prev.highRiskFactors);
+      next.delete('p_severe');
+      next.delete('p_moderate');
+      next.delete('p_mild');
+      if (wongBakerScore >= 7) next.add('p_severe');
+      else if (wongBakerScore >= 4) next.add('p_moderate');
+      else if (wongBakerScore >= 1) next.add('p_mild');
+      return { ...prev, highRiskFactors: next };
     });
     setShowRefTable(null);
   };
@@ -414,6 +429,7 @@ const App: React.FC = () => {
         <div className="flex gap-2 bg-white/80 backdrop-blur p-1.5 rounded-2xl border border-white shadow-sm">
           <button onClick={() => setShowRefTable('gcs')} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black">GCS评分</button>
           <button onClick={() => setShowRefTable('pts')} className="px-4 py-2 bg-rose-600 text-white rounded-xl text-[10px] font-black">创伤评分</button>
+          <button onClick={() => setShowRefTable('wong_baker')} className="px-4 py-2 bg-amber-500 text-white rounded-xl text-[10px] font-black">疼痛评分</button>
           <button onClick={() => setShowRefTable('sh_table')} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black">参考表</button>
         </div>
       </div>
@@ -548,7 +564,7 @@ const App: React.FC = () => {
            <div className="bg-white rounded-[40px] w-full max-w-xl shadow-2xl overflow-hidden p-8 border border-white">
               <div className="flex justify-between items-center mb-8">
                  <h3 className="text-xl font-black text-slate-800">
-                    {showRefTable === 'gcs' ? 'GCS 评分计算' : showRefTable === 'pts' ? '创伤评分' : '体征分级参考表'}
+                    {showRefTable === 'gcs' ? 'GCS 评分计算' : showRefTable === 'pts' ? '创伤评分' : showRefTable === 'wong_baker' ? 'Wong-Baker 疼痛评分' : '体征分级参考表'}
                  </h3>
                  <button onClick={() => setShowRefTable(null)} className="text-slate-300 hover:text-rose-500"><i className="fas fa-times-circle text-2xl"></i></button>
               </div>
@@ -707,7 +723,7 @@ const App: React.FC = () => {
                            同步总分: {gcsTotal}{gcsV === 'T' ? 'T' : ''}
                         </button>
                     </div>
-                 ) : (
+                 ) : showRefTable === 'pts' ? (
                     <div className="space-y-6">
                         <div className="flex justify-between items-end">
                            <div>
@@ -811,7 +827,44 @@ const App: React.FC = () => {
                            同步总分: {ptsTotal}
                         </button>
                     </div>
-                 )}
+                 ) : showRefTable === 'wong_baker' ? (
+                    <div className="space-y-6">
+                       <div className="flex justify-between items-end">
+                           <div>
+                              <p className="text-xs font-black text-amber-500">Wong-Baker 面部表情疼痛量表</p>
+                              <p className="text-[10px] opacity-50 italic">请根据患儿面部表情选择...</p>
+                           </div>
+                           <div className="text-right">
+                              <div className="text-xs font-black text-amber-600">{WONG_BAKER_CONFIG.find(c => c.score === wongBakerScore)?.label || ''}</div>
+                              <div className="text-2xl font-black text-slate-900">{wongBakerScore} <span className="text-xs font-normal opacity-30">/ 10</span></div>
+                           </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                           {WONG_BAKER_CONFIG.map(item => (
+                             <button 
+                               key={item.score} 
+                               onClick={() => setWongBakerScore(item.score)} 
+                               className={`w-full p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${wongBakerScore === item.score ? 'bg-amber-500 text-white border-amber-500 shadow-md scale-105' : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'}`}
+                             >
+                               <span className="text-4xl">{item.emoji}</span>
+                               <span className="font-black text-sm">{item.score}分 - {item.label}</span>
+                               <span className={`text-[9px] ${wongBakerScore === item.score ? 'text-amber-100' : 'text-slate-400'}`}>{item.desc}</span>
+                             </button>
+                           ))}
+                        </div>
+
+                        <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                           <p className="text-[9px] text-slate-400 leading-relaxed">
+                              <span className="font-bold text-slate-500">临床意义：</span>
+                              0分：无痛；1-3分：轻度疼痛；4-6分：中度疼痛；7-10分：重度/剧烈疼痛。
+                           </p>
+                        </div>
+                        <button onClick={applyWongBakerToTriage} className="w-full py-4 bg-amber-500 text-white rounded-2xl font-black shadow-lg shadow-amber-100 transition-transform active:scale-[0.98]">
+                           同步疼痛评分: {wongBakerScore}
+                        </button>
+                    </div>
+                 ) : null}
               </div>
            </div>
         </div>
